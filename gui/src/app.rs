@@ -133,7 +133,7 @@ impl TemplateApp {
         let tx2 = app.tx2.clone();
 
         std::thread::spawn(move || {
-            let result = pollster::block_on(async { init_parser(settings, tx.clone()) });
+            let result = init_parser(settings, tx.clone());
             // send result to app
             let _ = tx.send("App initialized".to_string());
             let _ = tx2.send(result);
@@ -162,10 +162,12 @@ impl eframe::App for TemplateApp {
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = &ui.ctx().clone();
+        let dark_mode = ui.style().visuals.dark_mode;
         // modals
         if self.settings_open {
-            let modal = Modal::new(Id::new("SettingsModal")).show(ctx, |ui| {
+            let modal = Modal::new(Id::unique("SettingsModal")).show(ctx, |ui| {
                 ui.set_width(250.0);
 
                 ui.heading("Settings");
@@ -237,8 +239,8 @@ impl eframe::App for TemplateApp {
         }
 
         // top panel
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+        egui::Panel::top("top_panel").show(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 // NOTE: no File->Quit on web pages!
                 let is_web = cfg!(target_arch = "wasm32");
                 if !is_web {
@@ -248,7 +250,7 @@ impl eframe::App for TemplateApp {
                             if let Err(e) = open::that(GRAPH_FILE) {
                                 error!("Error opening file: {}", e);
                             }
-                            ui.close_menu();
+                            ui.close();
                         }
 
                         ui.separator();
@@ -256,7 +258,7 @@ impl eframe::App for TemplateApp {
                         if ui.button("Settings").clicked() {
                             self.settings_open = true;
 
-                            ui.close_menu();
+                            ui.close();
                         }
 
                         ui.separator();
@@ -284,7 +286,7 @@ impl eframe::App for TemplateApp {
                 self.async_log += format!("{}\n", result).as_str();
             }
 
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
                 ui.label("Loading...");
                 ui.separator();
                 ui.label(&self.async_log);
@@ -303,9 +305,9 @@ impl eframe::App for TemplateApp {
         // Update the counter with the async response.
         if let Some(data) = &self.app_data {
             // side panel
-            egui::SidePanel::left("side_panel")
-                .min_width(200_f32)
-                .show(ctx, |ui| {
+            egui::Panel::left("side_panel")
+                .min_size(200_f32)
+                .show(ui, |ui| {
                     ui.heading("Load Order");
                     ui.horizontal(|ui| {
                         ui.radio_value(&mut self.mod_list_view, EModListView::LoadOrder, "Old");
@@ -330,8 +332,7 @@ impl eframe::App for TemplateApp {
                             self.modal_open = true;
 
                             std::thread::spawn(move || {
-                                let result =
-                                    pollster::block_on(async { init_parser(settings, tx.clone()) });
+                                let result = init_parser(settings, tx.clone());
                                 // send result to app
                                 let _ = tx.send("App initialized".to_string());
                                 let _ = tx2.send(result);
@@ -389,10 +390,8 @@ impl eframe::App for TemplateApp {
                             // get color for background
                             let mut bg_color = if !notes.is_empty() {
                                 let i = notes[0].1;
-                                let background_color = get_color_for_rule(
-                                    &data.warnings[i].rule,
-                                    ctx.style().visuals.dark_mode,
-                                );
+                                let background_color =
+                                    get_color_for_rule(&data.warnings[i].rule, dark_mode);
                                 // make it more transparent
                                 background_color.gamma_multiply(0.5)
                             } else {
@@ -404,7 +403,7 @@ impl eframe::App for TemplateApp {
                                 && mod_name.to_lowercase() == self.plugin_filter.to_lowercase()
                             {
                                 bg_color = Color32::LIGHT_BLUE;
-                                if ctx.style().visuals.dark_mode {
+                                if dark_mode {
                                     bg_color = Color32::DARK_BLUE;
                                 }
                             };
@@ -414,16 +413,14 @@ impl eframe::App for TemplateApp {
                                 && self.plugin_hover_filter.contains(&mod_name.to_lowercase());
                             if is_hover {
                                 let i = notes[0].1;
-                                bg_color = get_highlight_color_for_rule(
-                                    &data.warnings[i].rule,
-                                    ctx.style().visuals.dark_mode,
-                                );
+                                bg_color =
+                                    get_highlight_color_for_rule(&data.warnings[i].rule, dark_mode);
                             }
 
                             // item view
                             egui::Frame::new().fill(bg_color).show(ui, |ui| {
                                 // when hover and in dark mode, then make the text black
-                                let label = if is_hover && ctx.style().visuals.dark_mode {
+                                let label = if is_hover && dark_mode {
                                     Label::new(egui::RichText::new(mod_name).color(Color32::BLACK))
                                         .sense(Sense::click())
                                 } else {
@@ -446,7 +443,7 @@ impl eframe::App for TemplateApp {
                 });
 
             // main panel
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
                 // The central panel the region left after adding TopPanel's and SidePanel's
                 let game_version = if let Some(v) = &data.game_version {
                     v.to_string()
@@ -532,8 +529,7 @@ impl eframe::App for TemplateApp {
                         let mut frame = egui::Frame::default().inner_margin(4.0).begin(ui);
                         {
                             // create itemview
-                            let fore_color =
-                                get_color_for_rule(&w.rule, ctx.style().visuals.dark_mode);
+                            let fore_color = get_color_for_rule(&w.rule, dark_mode);
                             frame
                                 .content_ui
                                 .colored_label(fore_color, w.get_rule_name());
@@ -553,7 +549,7 @@ impl eframe::App for TemplateApp {
                         if response.hovered() {
                             let mut bg_color = egui::Color32::LIGHT_GRAY;
                             // if theme is dark, make it darker
-                            if ctx.style().visuals.dark_mode {
+                            if dark_mode {
                                 bg_color = Color32::DARK_GRAY;
                             }
                             frame.frame.fill = bg_color;
