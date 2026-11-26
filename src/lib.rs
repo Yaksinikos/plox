@@ -12,6 +12,7 @@ pub use commands::*;
 
 pub mod expressions;
 pub mod parser;
+pub mod pipeline;
 pub mod rules;
 pub mod sorter;
 

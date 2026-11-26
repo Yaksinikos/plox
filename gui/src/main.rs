@@ -2,22 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 fn main() -> eframe::Result<()> {
-    let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([400.0, 300.0])
-            .with_min_inner_size([300.0, 220.0])
-            .with_app_id("plox")
-            .with_icon(
-                // NOE: Adding an icon is optional
-                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
-                    .unwrap(),
-            ),
-        renderer: eframe::Renderer::Glow,
-        ..Default::default()
-    };
-    eframe::run_native(
-        "PLOX GUI",
-        native_options,
-        Box::new(|cc| Ok(Box::new(plox_gui::TemplateApp::new(cc)))),
-    )
+    plox_gui::launcher::run()
 }
