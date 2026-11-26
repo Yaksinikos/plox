@@ -29,6 +29,8 @@ pub struct GraphData {
     pub index_dict: HashMap<String, usize>,
     pub index_dict_rev: HashMap<usize, String>,
     pub edges: Vec<(usize, usize)>,
+    /// Order rule edges dropped because they would close a cycle
+    pub skipped: Vec<(usize, usize)>,
 }
 
 pub struct Sorter {
@@ -261,6 +263,7 @@ pub fn get_graph_data(
     }
 
     // add edges from masters
+    let master_start = edges.len();
     for mod_data in plugins {
         // add an edge from the mod to all its masters
         let idx = index_dict[&mod_data.name.to_lowercase()];
@@ -280,12 +283,103 @@ pub fn get_graph_data(
         }
     }
 
-    // return
+    let skipped = break_cycles(index_dict_rev.len(), &mut edges, master_start);
+    for (a, b) in &skipped {
+        warn!(
+            "Ignoring order rule {} -> {} because it contradicts other rules",
+            index_dict_rev[a], index_dict_rev[b]
+        );
+    }
+
     GraphData {
         index_dict,
         index_dict_rev,
         edges,
+        skipped,
     }
+}
+
+/// Removes edges that would close a cycle, like mlox does. Returns the removed edges.
+///
+/// Master edges (from `master_start` on) are kept first, then order rule edges in rule order.
+/// Only edges inside a strongly connected component can be part of a cycle, so all other
+/// edges are kept without further checks.
+fn break_cycles(
+    node_count: usize,
+    edges: &mut Vec<(usize, usize)>,
+    master_start: usize,
+) -> Vec<(usize, usize)> {
+    let mut full = StableGraph::<(), ()>::with_capacity(node_count, edges.len());
+    for _ in 0..node_count {
+        full.add_node(());
+    }
+    for (a, b) in edges.iter() {
+        full.add_edge(NodeIndex::new(*a), NodeIndex::new(*b), ());
+    }
+
+    let mut component = vec![usize::MAX; node_count];
+    let mut cyclic = false;
+    for (id, scc) in petgraph::algo::tarjan_scc(&full).iter().enumerate() {
+        if scc.len() > 1 {
+            cyclic = true;
+            for n in scc {
+                component[n.index()] = id;
+            }
+        }
+    }
+    if !cyclic {
+        return vec![];
+    }
+    let in_cycle =
+        |(a, b): &(usize, usize)| component[*a] != usize::MAX && component[*a] == component[*b];
+
+    // the acyclic part
+    let mut graph = StableGraph::<(), ()>::with_capacity(node_count, edges.len());
+    for _ in 0..node_count {
+        graph.add_node(());
+    }
+    for edge in edges.iter().filter(|e| !in_cycle(e)) {
+        graph.add_edge(NodeIndex::new(edge.0), NodeIndex::new(edge.1), ());
+    }
+
+    let candidates = edges[master_start..]
+        .iter()
+        .chain(&edges[..master_start])
+        .copied()
+        .filter(in_cycle)
+        .collect::<Vec<_>>();
+    let mut space = petgraph::algo::DfsSpace::new(&graph);
+    let mut skipped = vec![];
+    for (a, b) in candidates {
+        let (from, to) = (NodeIndex::new(a), NodeIndex::new(b));
+        if petgraph::algo::has_path_connecting(&graph, to, from, Some(&mut space)) {
+            skipped.push((a, b));
+        } else {
+            graph.add_edge(from, to, ());
+        }
+    }
+
+    edges.retain(|e| !skipped.contains(e));
+    skipped
+}
+
+/// Checks that `result` satisfies every edge of the graph
+#[must_use]
+pub fn check_graph_order(result: &[String], data: &GraphData) -> bool {
+    let position: HashMap<String, usize> = result
+        .iter()
+        .enumerate()
+        .map(|(i, name)| (name.to_lowercase(), i))
+        .collect();
+    data.edges.iter().all(|(a, b)| {
+        match (
+            position.get(&data.index_dict_rev[a]),
+            position.get(&data.index_dict_rev[b]),
+        ) {
+            (Some(pos_a), Some(pos_b)) => pos_a < pos_b,
+            _ => true,
+        }
+    })
 }
 
 #[must_use]

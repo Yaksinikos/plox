@@ -34,26 +34,23 @@ mod unit_tests {
             .map(|e| PluginData::new(e.to_string(), 0))
             .collect();
 
-        assert!(
-            sorter::new_unstable_sorter()
-                .topo_sort(ESupportedGame::Morrowind, &mods, &order, &[])
-                .is_err(),
-            "unstable rules do not contain a cycle"
-        );
+        // the contradicting rule `b -> a` comes last and is dropped
+        let data = sorter::get_graph_data(&mods, &order, &[]);
+        assert_eq!(data.skipped.len(), 1);
 
-        assert!(
-            new_stable_full_sorter()
+        for mut sorter in [
+            sorter::new_unstable_sorter(),
+            new_stable_full_sorter(),
+            sorter::new_stable_sorter(),
+        ] {
+            let result = sorter
                 .topo_sort(ESupportedGame::Morrowind, &mods, &order, &[])
-                .is_err(),
-            "stable(false) rules do not contain a cycle"
-        );
-
-        assert!(
-            sorter::new_stable_sorter()
-                .topo_sort(ESupportedGame::Morrowind, &mods, &order, &[])
-                .is_err(),
-            "stable(true) rules do not contain a cycle"
-        );
+                .unwrap_or_else(|e| panic!("Error: {e}"));
+            let pos = |n: &str| result.iter().position(|r| r == n);
+            assert!(pos("a") < pos("b"), "first rule must win: {result:?}");
+            assert!(pos("b") < pos("c"));
+            assert!(pos("d") < pos("e"));
+        }
     }
 
     #[test]

@@ -60,6 +60,12 @@ mod integration_tests {
         mods_cpy
     }
 
+    /// Checks the result against the order rules plox keeps (contradicting rules are dropped)
+    fn order_ok(result: &[String], mods: &[PluginData], parser: &Parser) -> bool {
+        let data = get_graph_data(mods, &parser.order_rules, &parser.warning_rules);
+        check_graph_order(result, &data)
+    }
+
     #[test]
     fn test_read_mods() {
         init();
@@ -99,7 +105,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -114,7 +120,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -290,7 +296,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -323,7 +329,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -354,7 +360,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -387,7 +393,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -420,7 +426,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
@@ -455,7 +461,7 @@ mod integration_tests {
         ) {
             Ok(result) => {
                 assert!(
-                    check_order(&result, &parser.order_rules),
+                    order_ok(&result, &mods, &parser),
                     "stable(true) order is wrong"
                 );
             }
