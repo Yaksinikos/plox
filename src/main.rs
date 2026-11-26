@@ -37,7 +37,7 @@ enum Command {
         #[arg(short, long)]
         game_folder: Option<PathBuf>,
 
-        /// Folder to read sorting rules from. Default is ./mlox for TES3
+        /// Folder to read sorting rules from. Default is ./mlox (TES3) or ./plox if present, otherwise the plox data folder
         #[arg(short, long)]
         rules_dir: Option<String>,
 
@@ -65,7 +65,7 @@ enum Command {
     },
     /// Verifies integrity of the specified rules
     Verify {
-        /// Folder to read sorting rules from. Default is ./plox or ./mlox for TES3
+        /// Folder to read sorting rules from. Default is ./mlox (TES3) or ./plox if present, otherwise the plox data folder
         #[arg(short, long)]
         rules_dir: Option<String>,
     },
@@ -75,7 +75,7 @@ enum Command {
         #[arg(short, long)]
         game_folder: Option<PathBuf>,
 
-        /// Folder to read sorting rules from. Default is ./mlox for TES3
+        /// Folder to read sorting rules from. Default is ./mlox (TES3) or ./plox if present, otherwise the plox data folder
         #[arg(short, long)]
         rules_dir: Option<String>,
 

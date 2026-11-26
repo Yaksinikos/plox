@@ -1,6 +1,6 @@
 use egui::{Id, Modal};
 
-use crate::settings::{AppSettings, PLOX_CONF_FILE};
+use crate::settings::{AppSettings, settings_file};
 
 const LOG_LEVELS: [(&str, &str); 5] = [
     ("trace", "Trace"),
@@ -38,7 +38,7 @@ pub fn show(ctx: &egui::Context, settings: &mut AppSettings) -> bool {
             |_ui| {},
             |ui| {
                 if ui.button("Save").clicked() {
-                    settings.save(PLOX_CONF_FILE.as_ref());
+                    settings.save(&settings_file());
                     open = false;
                 }
                 if ui.button("Cancel").clicked() {

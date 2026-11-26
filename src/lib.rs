@@ -153,17 +153,45 @@ pub fn debug_get_mods_from_ordering(order: &[(String, String)]) -> Vec<PluginDat
     result
 }
 
-/// Gets the default rules dir for a game
+/// Name of the plox folder inside the platform directories
+pub const PLOX_APP_DIR: &str = "plox";
+
+/// The plox folder in the platform config dir
+/// (`~/.config/plox`, `%APPDATA%\plox`, `~/Library/Application Support/plox`)
+#[must_use]
+pub fn user_config_dir() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join(PLOX_APP_DIR))
+}
+
+/// The plox folder in the platform data dir
+/// (`~/.local/share/plox`, `%APPDATA%\plox`, `~/Library/Application Support/plox`)
+#[must_use]
+pub fn user_data_dir() -> Option<PathBuf> {
+    dirs::data_dir().map(|d| d.join(PLOX_APP_DIR))
+}
+
+/// Returns `name` in the current folder if it exists there, otherwise in `platform_dir`.
+/// Falls back to the current folder if there is no platform dir.
+#[must_use]
+pub fn local_or_platform(name: &str, platform_dir: Option<PathBuf>) -> PathBuf {
+    let local = PathBuf::from(name);
+    if local.exists() {
+        return local;
+    }
+    platform_dir.map_or(local, |d| d.join(name))
+}
+
+/// Gets the default rules dir for a game.
 ///
-/// # Errors
-///
-/// This function will return an error if .
+/// A rules folder (`mlox` or `plox`) in the current folder is used first,
+/// otherwise the one in the platform data dir.
 #[must_use]
 pub fn get_default_rules_dir(game: ESupportedGame) -> PathBuf {
-    match game {
-        ESupportedGame::Morrowind | ESupportedGame::Openmw => PathBuf::from("mlox"),
-        ESupportedGame::Cyberpunk => PathBuf::from("plox"),
-    }
+    let name = match game {
+        ESupportedGame::Morrowind | ESupportedGame::Openmw => "mlox",
+        ESupportedGame::Cyberpunk => "plox",
+    };
+    local_or_platform(name, user_data_dir())
 }
 
 /// Download latest rules from the internet

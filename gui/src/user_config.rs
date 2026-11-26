@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::renderer::RendererChoice;
 
-const APP_DIR: &str = "plox";
-const CONFIG_FILE: &str = "plox.toml";
+const CONFIG_FILE: &str = crate::settings::PLOX_CONF_FILE;
 const CRASH_MARKER_FILE: &str = "renderer.crash";
 
 /// `[renderer]` section of the user config
@@ -38,7 +37,7 @@ struct UserConfigFile {
 /// The plox folder inside the platform config dir
 #[must_use]
 pub fn config_dir() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join(APP_DIR))
+    plox::user_config_dir()
 }
 
 #[must_use]

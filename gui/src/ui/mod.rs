@@ -9,7 +9,6 @@ pub use renderer_chooser::ChooserState;
 
 use std::{
     fs::File,
-    path::PathBuf,
     sync::mpsc::{Receiver, Sender},
 };
 
@@ -19,7 +18,7 @@ use simplelog::WriteLogger;
 
 use crate::{
     renderer::Backend,
-    settings::{AppSettings, PLOX_CONF_FILE, PLOX_LOG_FILE},
+    settings::{AppSettings, log_file, settings_file},
 };
 
 #[derive(PartialEq, Eq)]
@@ -141,7 +140,7 @@ impl PloxApp {
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
 
-        app.settings = AppSettings::from_file(&PathBuf::from(PLOX_CONF_FILE));
+        app.settings = AppSettings::from_file(&settings_file());
         app.smoke_test = options.smoke_test;
         app.chooser = options.chooser;
 
@@ -228,12 +227,16 @@ impl PloxApp {
     }
 }
 
-/// Initializes logging from the `plox.toml` in the current folder.
+/// Initializes logging from the settings file.
 pub fn init_logger() {
-    let settings = AppSettings::from_file(&PathBuf::from(PLOX_CONF_FILE));
+    let settings = AppSettings::from_file(&settings_file());
     let level = level_from_str(settings.log_level.as_deref().unwrap_or("info"));
+    let log_path = log_file();
     if settings.log_to_file
-        && let Ok(file) = File::create(PathBuf::from(PLOX_LOG_FILE))
+        && log_path
+            .parent()
+            .is_none_or(|p| p.as_os_str().is_empty() || std::fs::create_dir_all(p).is_ok())
+        && let Ok(file) = File::create(&log_path)
     {
         let _ = WriteLogger::init(level, simplelog::Config::default(), file);
     } else {

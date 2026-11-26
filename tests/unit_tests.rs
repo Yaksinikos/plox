@@ -19,6 +19,24 @@ mod unit_tests {
     }
 
     #[test]
+    fn test_local_folder_is_checked_before_platform_dir() {
+        let platform = std::path::PathBuf::from("platform");
+        // `tests` exists in the working directory of the test
+        assert_eq!(
+            local_or_platform("tests", Some(platform.clone())),
+            std::path::PathBuf::from("tests")
+        );
+        assert_eq!(
+            local_or_platform("does-not-exist", Some(platform.clone())),
+            platform.join("does-not-exist")
+        );
+        assert_eq!(
+            local_or_platform("does-not-exist", None),
+            std::path::PathBuf::from("does-not-exist")
+        );
+    }
+
+    #[test]
     fn test_wildcard_escapes_regex_metacharacters() {
         // rfuzzo/plox#37
         let list = vec![

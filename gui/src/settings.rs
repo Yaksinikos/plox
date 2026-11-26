@@ -1,9 +1,21 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use log::error;
 
 pub const PLOX_LOG_FILE: &str = "plox.log";
 pub const PLOX_CONF_FILE: &str = "plox.toml";
+
+/// The `plox.toml` in the current folder if it exists, otherwise the one in the user config folder
+#[must_use]
+pub fn settings_file() -> PathBuf {
+    plox::local_or_platform(PLOX_CONF_FILE, plox::user_config_dir())
+}
+
+/// The log file, next to the settings file
+#[must_use]
+pub fn log_file() -> PathBuf {
+    settings_file().with_file_name(PLOX_LOG_FILE)
+}
 
 const SETTINGS_KEYS: [&str; 5] = [
     "game",
