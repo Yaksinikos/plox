@@ -56,6 +56,10 @@ enum Command {
         /// Read the input mods from a file instead of checking the root folder
         #[arg(short, long)]
         mod_list: Option<PathBuf>,
+
+        /// Do not back up the load order file (Morrowind.ini or openmw.cfg) before saving
+        #[arg(long)]
+        no_backup: bool,
     },
     /// Lists the current mod load order
     List {
@@ -140,6 +144,7 @@ fn main() -> ExitCode {
             dry_run,
             unstable,
             no_download,
+            no_backup,
         } => sort(&CliSortOptions {
             game,
             game_folder: root.clone(),
@@ -148,6 +153,7 @@ fn main() -> ExitCode {
             dry_run: *dry_run,
             unstable: *unstable,
             no_download: *no_download,
+            backup: !*no_backup,
         }),
     };
 

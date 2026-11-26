@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - `plox.toml` and rules are read from the platform config/data folders if they are not in the current folder #33
 - OpenMW config detection in the default OpenMW config folders
 - CI for Windows, Linux and macOS with lint, MSRV and headless renderer checks
+- Daily backup of `Morrowind.ini` / the user `openmw.cfg` before saving a new load order (`backup_load_order`, on by default; `plox sort --no-backup`)
 
 ### Changed
 

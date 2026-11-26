@@ -80,4 +80,28 @@ mod openmw_tests {
         assert!(text.contains("fallback-archive=Morrowind.bsa"), "{text}");
         assert!(text.contains("no-sound=0"), "{text}");
     }
+
+    #[test]
+    fn test_save_load_order_backs_up_user_cfg() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cfg_path = tmp.path().join("openmw.cfg");
+        let original = "content=a.esp\ncontent=b.esp\n";
+        fs::write(&cfg_path, original).unwrap();
+
+        let mut cfg = OpenMWConfiguration::new(Some(tmp.path().to_path_buf())).unwrap();
+        plox::save_openmw_load_order(
+            &mut cfg,
+            &["b.esp".to_owned(), "a.esp".to_owned()],
+            Some(jiff::civil::date(2026, 11, 26)),
+        )
+        .unwrap();
+
+        let backup = tmp.path().join("openmw_26-11-2026.cfg");
+        assert_eq!(fs::read_to_string(&backup).unwrap(), original);
+        let text = fs::read_to_string(&cfg_path).unwrap();
+        assert!(
+            text.find("content=b.esp") < text.find("content=a.esp"),
+            "{text}"
+        );
+    }
 }

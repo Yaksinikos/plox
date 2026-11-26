@@ -62,6 +62,7 @@ log = { workspace = true }
 env_logger = { workspace = true }
 serde = { workspace = true }
 openmw-config = { version = "3.0.2", default-features = false }
+jiff = { version = "1", default-features = false, features = ["std", "tz-system", "tzdb-bundle-platform", "tzdb-zoneinfo"] }
 
 [lints]
 workspace = true

@@ -50,6 +50,7 @@ mod tes3_tests {
             tmp.path(),
             &["morrowind.esm".to_owned(), "test.esp".to_owned()],
             false,
+            None,
         )
         .unwrap();
 
@@ -57,5 +58,30 @@ mod tes3_tests {
         assert!(ini.contains("Foo=1"), "{ini}");
         assert!(ini.contains("GameFile0=Morrowind.esm"), "{ini}");
         assert!(ini.contains("GameFile1=Test.esp"), "{ini}");
+        assert_eq!(
+            fs::read_dir(tmp.path()).unwrap().count(),
+            2,
+            "no backup expected"
+        );
+    }
+
+    #[test]
+    fn test_update_backs_up_ini_before_writing() {
+        let tmp = game_folder();
+        let original = fs::read_to_string(tmp.path().join("morrowind.ini")).unwrap();
+        let date = jiff::civil::date(2026, 11, 26);
+
+        update_tes3(
+            tmp.path(),
+            &["test.esp".to_owned(), "morrowind.esm".to_owned()],
+            false,
+            Some(date),
+        )
+        .unwrap();
+
+        let backup = tmp.path().join("morrowind_26-11-2026.ini");
+        assert_eq!(fs::read_to_string(&backup).unwrap(), original);
+        let ini = fs::read_to_string(tmp.path().join("morrowind.ini")).unwrap();
+        assert!(ini.contains("GameFile0=Test.esp"), "{ini}");
     }
 }

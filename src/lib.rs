@@ -712,19 +712,62 @@ where
     vec![]
 }
 
-/// Update on disk
+/// Today's local date, for backup names
+#[must_use]
+pub fn today() -> jiff::civil::Date {
+    jiff::ZonedDateTime::now().date()
+}
+
+/// Path of the backup of `path` for `date`: `openmw.cfg` becomes `openmw_26-11-2026.cfg`.
+#[must_use]
+pub fn backup_path(path: &Path, date: jiff::civil::Date) -> PathBuf {
+    let stem = path
+        .file_stem()
+        .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+    let stamp = format!("{:02}-{:02}-{:04}", date.day(), date.month(), date.year());
+    let name = path.extension().map_or_else(
+        || format!("{stem}_{stamp}"),
+        |ext| format!("{stem}_{stamp}.{}", ext.to_string_lossy()),
+    );
+    path.with_file_name(name)
+}
+
+/// Copies `path` next to itself as the backup for `date`, unless that backup already exists.
+///
+/// Returns the backup path if a copy was made. Nothing is copied if `path` does not exist.
 ///
 /// # Errors
 ///
-/// Returns an error if the load order cannot be written.
+/// Returns an error if the backup cannot be written.
+pub fn backup_once_per_day(path: &Path, date: jiff::civil::Date) -> io::Result<Option<PathBuf>> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let backup = backup_path(path, date);
+    if backup.exists() {
+        info!("Backup for today already exists: {}", backup.display());
+        return Ok(None);
+    }
+    fs::copy(path, &backup)?;
+    info!("Backed up {} to {}", path.display(), backup.display());
+    Ok(Some(backup))
+}
+
+/// Update on disk. With `backup`, the load order file is backed up first (once per day).
+///
+/// # Errors
+///
+/// Returns an error if the backup or the load order cannot be written.
 pub fn update_new_load_order(
     game: ESupportedGame,
     root: &Path,
     result: &[String],
+    backup: bool,
 ) -> std::io::Result<()> {
+    let backup_date = backup.then(today);
     match game {
-        ESupportedGame::Morrowind => update_tes3(root, result, false),
-        ESupportedGame::Openmw => update_openmw(result),
+        ESupportedGame::Morrowind => update_tes3(root, result, false, backup_date),
+        ESupportedGame::Openmw => update_openmw(result, backup_date),
         ESupportedGame::Cyberpunk => update_cp77(result),
     }
 }
@@ -737,26 +780,49 @@ fn update_cp77(_result: &[String]) -> std::io::Result<()> {
     ))
 }
 
-fn update_openmw(result: &[String]) -> std::io::Result<()> {
-    // only the user openmw.cfg is written; parent configs get a `replace=content` there if needed
+fn update_openmw(result: &[String], backup: Option<jiff::civil::Date>) -> std::io::Result<()> {
     let mut cfg = load_openmw_config()?;
+    save_openmw_load_order(&mut cfg, result, backup)
+}
+
+/// Writes `result` as the `content=` list of the user `openmw.cfg` of `cfg`.
+///
+/// Only the user openmw.cfg is written; parent configs get a `replace=content` there if needed.
+/// With `backup`, the user openmw.cfg is backed up first (once per day).
+///
+/// # Errors
+///
+/// Returns an error if the backup or the cfg cannot be written.
+pub fn save_openmw_load_order(
+    cfg: &mut openmw_config::OpenMWConfiguration,
+    result: &[String],
+    backup: Option<jiff::civil::Date>,
+) -> std::io::Result<()> {
+    let user_cfg = cfg.user_config_path().join("openmw.cfg");
+    if let Some(date) = backup {
+        backup_once_per_day(&user_cfg, date)?;
+    }
     cfg.set_content_files(Some(result.to_vec()));
     cfg.save_user().map_err(io::Error::other)?;
-    info!(
-        "Saved load order to {}",
-        cfg.user_config_path().join("openmw.cfg").display()
-    );
+    info!("Saved load order to {}", user_cfg.display());
     Ok(())
 }
 
 /// Writes the load order to `Morrowind.ini` in `root` and redates the plugins in `Data Files`.
 ///
 /// Plugin names are matched case-insensitively and written with their case on disk.
+/// With `backup`, `Morrowind.ini` is backed up first (once per day). The plugin dates are
+/// not part of the backup.
 ///
 /// # Errors
 ///
-/// Returns an error if the ini cannot be written or plugins cannot be redated.
-pub fn update_tes3(root: &Path, result: &[String], no_redate: bool) -> std::io::Result<()> {
+/// Returns an error if the backup or the ini cannot be written or plugins cannot be redated.
+pub fn update_tes3(
+    root: &Path,
+    result: &[String],
+    no_redate: bool,
+    backup: Option<jiff::civil::Date>,
+) -> std::io::Result<()> {
     let data_files = find_case_insensitive(root, "Data Files");
     let on_disk: HashMap<String, String> = fs::read_dir(&data_files)
         .map(|entries| {
@@ -778,6 +844,9 @@ pub fn update_tes3(root: &Path, result: &[String], no_redate: bool) -> std::io::
     // in tes3 we first update the ini with the new order (this is technically not important but we might as well)
     let morrowind_ini_path = find_case_insensitive(root, "Morrowind.ini");
     if morrowind_ini_path.exists() {
+        if let Some(date) = backup {
+            backup_once_per_day(&morrowind_ini_path, date)?;
+        }
         // parse ini
         let mut buf = Vec::new();
         for line in read_lines(&morrowind_ini_path)?.map_while(Result::ok) {

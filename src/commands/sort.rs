@@ -8,6 +8,10 @@ use crate::{
     get_game_version, parser, sorter, update_new_load_order,
 };
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors independent command line flags"
+)]
 pub struct CliSortOptions {
     pub game: ESupportedGame,
     pub game_folder: Option<PathBuf>,
@@ -16,6 +20,8 @@ pub struct CliSortOptions {
     pub dry_run: bool,
     pub unstable: bool,
     pub no_download: bool,
+    /// Back up the load order file once per day before saving
+    pub backup: bool,
 }
 
 /// Sorts the current mod load order according to specified rules
@@ -68,7 +74,7 @@ pub fn sort(options: &CliSortOptions) -> ExitCode {
     };
 
     match sorter.topo_sort(game, &mods, &parser.order_rules, &parser.warning_rules) {
-        Ok(result) => apply_result(game, &root, &mods, &result, options.dry_run),
+        Ok(result) => apply_result(game, &root, &mods, &result, options),
         Err(e) => {
             error!("error sorting: {e:?}");
             ExitCode::FAILURE
@@ -104,8 +110,9 @@ fn apply_result(
     root: &std::path::Path,
     mods: &[PluginData],
     result: &[String],
-    dry_run: bool,
+    options: &CliSortOptions,
 ) -> ExitCode {
+    let dry_run = options.dry_run;
     let unchanged = mods
         .iter()
         .map(|f| f.name.to_lowercase())
@@ -130,7 +137,7 @@ fn apply_result(
     }
 
     info!("New:\n{result:?}");
-    match update_new_load_order(game, root, result) {
+    match update_new_load_order(game, root, result, options.backup) {
         Ok(()) => {
             info!("Update successful");
             ExitCode::SUCCESS

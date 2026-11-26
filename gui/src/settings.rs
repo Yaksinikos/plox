@@ -17,16 +17,21 @@ pub fn log_file() -> PathBuf {
     settings_file().with_file_name(PLOX_LOG_FILE)
 }
 
-const SETTINGS_KEYS: [&str; 5] = [
+const SETTINGS_KEYS: [&str; 6] = [
     "game",
     "no_rules_download",
     "log_level",
     "log_to_file",
     "ignore_warnings",
+    "backup_load_order",
 ];
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "mirrors independent plox.toml switches"
+)]
 pub struct AppSettings {
     /// Specifies the game to use
     pub game: Option<plox::ESupportedGame>,
@@ -42,6 +47,22 @@ pub struct AppSettings {
 
     /// ignore warnings
     pub ignore_warnings: bool,
+
+    /// back up the load order file (Morrowind.ini or openmw.cfg) once per day before saving
+    pub backup_load_order: bool,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            game: None,
+            no_rules_download: false,
+            log_level: None,
+            log_to_file: false,
+            ignore_warnings: false,
+            backup_load_order: true,
+        }
+    }
 }
 
 impl AppSettings {

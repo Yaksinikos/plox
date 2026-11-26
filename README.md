@@ -32,6 +32,7 @@ no_rules_download = false
 log_level = "info"
 log_to_file = false      # writes plox.log next to plox.toml
 ignore_warnings = false
+backup_load_order = true # back up Morrowind.ini / openmw.cfg before saving, see below
 
 [renderer]
 backend = "auto"         # auto, glow or wgpu
@@ -39,6 +40,19 @@ ask_on_startup = true    # show the renderer dialog on every start
 ```
 
 Rules are downloaded into an `mlox` (TES3/OpenMW) or `plox` (Cyberpunk) folder. If that folder exists in the current folder it is used; otherwise the rules are stored in the user data folder (`%APPDATA%\plox\`, `~/.local/share/plox/`, `~/Library/Application Support/plox/`).
+
+### Load order backups
+
+Before PLOX saves a new load order, it copies the file it is about to change next to itself, with the local date in the name:
+
+- OpenMW: the user `openmw.cfg` → `openmw_26-11-2026.cfg`
+- Morrowind: `Morrowind.ini` → `Morrowind_26-11-2026.ini`
+
+Only one backup is made per day. If today's backup already exists it is left alone, so it holds the file as it was before PLOX's first change that day. If the backup cannot be written, the load order is not saved.
+
+The GUI setting is `backup_load_order` (on by default, also in the settings window). On the command line, `plox sort --no-backup` skips the backup.
+
+For Morrowind, PLOX also changes the modified dates of the plugin files in `Data Files`. These dates are not part of the backup, so restoring the ini alone does not fully restore the old order.
 
 ### Game detection
 
@@ -165,6 +179,7 @@ Options:
   -d, --dry-run                    Just print the suggested load order without sorting
   -u, --unstable                   Use the potentially faster unstable sorter
   -n, --no-download                Disable automatic downloading of latest ruleset
+      --no-backup                  Do not back up the load order file (Morrowind.ini or openmw.cfg) before saving
   -m, --mod-list <MOD_LIST>        Read the input mods from a file instead of checking the root folder
   -h, --help                       Print help
 ```

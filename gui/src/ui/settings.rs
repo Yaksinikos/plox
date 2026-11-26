@@ -31,6 +31,14 @@ pub fn show(ctx: &egui::Context, settings: &mut AppSettings) -> bool {
 
         ui.checkbox(&mut settings.log_to_file, "Log to file");
         ui.checkbox(&mut settings.ignore_warnings, "Ignore warnings");
+        ui.checkbox(
+            &mut settings.backup_load_order,
+            "Back up the load order file before saving (one per day)",
+        )
+        .on_hover_text(
+            "Copies Morrowind.ini or openmw.cfg next to itself as e.g. openmw_26-11-2026.cfg \
+             before the first change of the day",
+        );
 
         ui.separator();
         egui::Sides::new().show(
