@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use log::info;
 
-use crate::*;
+use crate::{ESupportedGame, env, gather_mods};
 
 /// Lists the current mod load order
 pub fn list_mods(root: &Option<PathBuf>, game: ESupportedGame) -> ExitCode {

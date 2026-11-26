@@ -9,7 +9,11 @@ use std::{
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use crate::{PluginData, expressions::*, parser};
+use crate::{
+    PluginData,
+    expressions::{Expression, TExpression},
+    parser,
+};
 
 ///////////////////////////////////////////////////
 // ENUMS
@@ -53,46 +57,46 @@ pub trait TWarningRule {
 impl TWarningRule for EWarningRule {
     fn get_comment(&self) -> String {
         match self {
-            EWarningRule::Note(x) => x.get_comment(),
-            EWarningRule::Conflict(x) => x.get_comment(),
-            EWarningRule::Requires(x) => x.get_comment(),
-            EWarningRule::Patch(x) => x.get_comment(),
+            Self::Note(x) => x.get_comment(),
+            Self::Conflict(x) => x.get_comment(),
+            Self::Requires(x) => x.get_comment(),
+            Self::Patch(x) => x.get_comment(),
         }
     }
 
     fn get_ui_comment(&self) -> String {
         match self {
-            EWarningRule::Note(x) => x.get_ui_comment(),
-            EWarningRule::Conflict(x) => x.get_ui_comment(),
-            EWarningRule::Requires(x) => x.get_ui_comment(),
-            EWarningRule::Patch(x) => x.get_ui_comment(),
+            Self::Note(x) => x.get_ui_comment(),
+            Self::Conflict(x) => x.get_ui_comment(),
+            Self::Requires(x) => x.get_ui_comment(),
+            Self::Patch(x) => x.get_ui_comment(),
         }
     }
 
     fn get_plugins(&self) -> Vec<String> {
         match self {
-            EWarningRule::Note(x) => x.get_plugins(),
-            EWarningRule::Conflict(x) => x.get_plugins(),
-            EWarningRule::Requires(x) => x.get_plugins(),
-            EWarningRule::Patch(x) => x.get_plugins(),
+            Self::Note(x) => x.get_plugins(),
+            Self::Conflict(x) => x.get_plugins(),
+            Self::Requires(x) => x.get_plugins(),
+            Self::Patch(x) => x.get_plugins(),
         }
     }
 
     fn set_comment(&mut self, comment: String) {
         match self {
-            EWarningRule::Note(x) => x.set_comment(comment),
-            EWarningRule::Conflict(x) => x.set_comment(comment),
-            EWarningRule::Requires(x) => x.set_comment(comment),
-            EWarningRule::Patch(x) => x.set_comment(comment),
+            Self::Note(x) => x.set_comment(comment),
+            Self::Conflict(x) => x.set_comment(comment),
+            Self::Requires(x) => x.set_comment(comment),
+            Self::Patch(x) => x.set_comment(comment),
         }
     }
 
     fn eval(&mut self, items: &[PluginData]) -> bool {
         match self {
-            EWarningRule::Note(o) => o.eval(items),
-            EWarningRule::Conflict(o) => o.eval(items),
-            EWarningRule::Requires(o) => o.eval(items),
-            EWarningRule::Patch(o) => o.eval(items),
+            Self::Note(o) => o.eval(items),
+            Self::Conflict(o) => o.eval(items),
+            Self::Requires(o) => o.eval(items),
+            Self::Patch(o) => o.eval(items),
         }
     }
 }
@@ -105,44 +109,44 @@ pub trait TParser<T> {
     ) -> Result<()>;
 }
 
-impl TParser<ERule> for ERule {
+impl TParser<Self> for ERule {
     fn parse<R: Read + BufRead + Seek>(
-        rule: &mut ERule,
+        rule: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
         match rule {
-            ERule::EOrderRule(rule) => EOrderRule::parse(rule, reader, parser),
-            ERule::EWarningRule(rule) => EWarningRule::parse(rule, reader, parser),
+            Self::EOrderRule(rule) => EOrderRule::parse(rule, reader, parser),
+            Self::EWarningRule(rule) => EWarningRule::parse(rule, reader, parser),
         }
     }
 }
 
-impl TParser<EWarningRule> for EWarningRule {
+impl TParser<Self> for EWarningRule {
     fn parse<R: Read + BufRead + Seek>(
-        rule: &mut EWarningRule,
+        rule: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
         match rule {
-            EWarningRule::Note(rule) => Note::parse(rule, reader, parser),
-            EWarningRule::Conflict(rule) => Conflict::parse(rule, reader, parser),
-            EWarningRule::Requires(rule) => Requires::parse(rule, reader, parser),
-            EWarningRule::Patch(rule) => Patch::parse(rule, reader, parser),
+            Self::Note(rule) => Note::parse(rule, reader, parser),
+            Self::Conflict(rule) => Conflict::parse(rule, reader, parser),
+            Self::Requires(rule) => Requires::parse(rule, reader, parser),
+            Self::Patch(rule) => Patch::parse(rule, reader, parser),
         }
     }
 }
 
-impl TParser<EOrderRule> for EOrderRule {
+impl TParser<Self> for EOrderRule {
     fn parse<R: Read + BufRead + Seek>(
-        rule: &mut EOrderRule,
+        rule: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
         match rule {
-            EOrderRule::Order(rule) => Order::parse(rule, reader, parser),
-            EOrderRule::NearStart(rule) => NearStart::parse(rule, reader, parser),
-            EOrderRule::NearEnd(rule) => NearEnd::parse(rule, reader, parser),
+            Self::Order(rule) => Order::parse(rule, reader, parser),
+            Self::NearStart(rule) => NearStart::parse(rule, reader, parser),
+            Self::NearEnd(rule) => NearEnd::parse(rule, reader, parser),
         }
     }
 }
@@ -151,88 +155,88 @@ impl TParser<EOrderRule> for EOrderRule {
 // top level
 impl From<EOrderRule> for ERule {
     fn from(val: EOrderRule) -> Self {
-        ERule::EOrderRule(val)
+        Self::EOrderRule(val)
     }
 }
 impl From<EWarningRule> for ERule {
     fn from(val: EWarningRule) -> Self {
-        ERule::EWarningRule(val)
+        Self::EWarningRule(val)
     }
 }
 
 // Order
 impl From<Order> for ERule {
     fn from(val: Order) -> Self {
-        ERule::EOrderRule(val.into())
+        Self::EOrderRule(val.into())
     }
 }
 impl From<NearStart> for ERule {
     fn from(val: NearStart) -> Self {
-        ERule::EOrderRule(val.into())
+        Self::EOrderRule(val.into())
     }
 }
 impl From<NearEnd> for ERule {
     fn from(val: NearEnd) -> Self {
-        ERule::EOrderRule(val.into())
+        Self::EOrderRule(val.into())
     }
 }
 
 impl From<Order> for EOrderRule {
     fn from(val: Order) -> Self {
-        EOrderRule::Order(val)
+        Self::Order(val)
     }
 }
 impl From<NearStart> for EOrderRule {
     fn from(val: NearStart) -> Self {
-        EOrderRule::NearStart(val)
+        Self::NearStart(val)
     }
 }
 impl From<NearEnd> for EOrderRule {
     fn from(val: NearEnd) -> Self {
-        EOrderRule::NearEnd(val)
+        Self::NearEnd(val)
     }
 }
 
 // Warnings
 impl From<Note> for ERule {
     fn from(val: Note) -> Self {
-        ERule::EWarningRule(val.into())
+        Self::EWarningRule(val.into())
     }
 }
 impl From<Conflict> for ERule {
     fn from(val: Conflict) -> Self {
-        ERule::EWarningRule(val.into())
+        Self::EWarningRule(val.into())
     }
 }
 impl From<Requires> for ERule {
     fn from(val: Requires) -> Self {
-        ERule::EWarningRule(val.into())
+        Self::EWarningRule(val.into())
     }
 }
 impl From<Patch> for ERule {
     fn from(val: Patch) -> Self {
-        ERule::EWarningRule(val.into())
+        Self::EWarningRule(val.into())
     }
 }
 
 impl From<Note> for EWarningRule {
     fn from(val: Note) -> Self {
-        EWarningRule::Note(val)
+        Self::Note(val)
     }
 }
 impl From<Conflict> for EWarningRule {
     fn from(val: Conflict) -> Self {
-        EWarningRule::Conflict(val)
+        Self::Conflict(val)
     }
 }
 impl From<Requires> for EWarningRule {
     fn from(val: Requires) -> Self {
-        EWarningRule::Requires(val)
+        Self::Requires(val)
     }
 }
 impl From<Patch> for EWarningRule {
     fn from(val: Patch) -> Self {
-        EWarningRule::Patch(val)
+        Self::Patch(val)
     }
 }
 
@@ -249,19 +253,21 @@ pub struct Order {
     pub names: Vec<String>,
 }
 impl Order {
-    pub fn new(names: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(names: Vec<String>) -> Self {
         Self { names }
     }
 
+    #[must_use]
     pub fn from(name_a: &str, name_b: &str) -> Self {
         Self {
             names: [name_a.to_owned(), name_b.to_owned()].to_vec(),
         }
     }
 }
-impl TParser<Order> for Order {
+impl TParser<Self> for Order {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut Order,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -298,19 +304,20 @@ impl TParser<Order> for Order {
 ////////////////////////////////////////////////////////////////////////
 // NEARSTART
 
-/// The [NearStart] rule specifies that one or more plugins should appear as near as possible to the Start of the load order.
+/// The [`NearStart`] rule specifies that one or more plugins should appear as near as possible to the Start of the load order.
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct NearStart {
     pub names: Vec<String>,
 }
 impl NearStart {
-    pub fn new(names: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(names: Vec<String>) -> Self {
         Self { names }
     }
 }
-impl TParser<NearStart> for NearStart {
+impl TParser<Self> for NearStart {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut NearStart,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -340,19 +347,20 @@ impl TParser<NearStart> for NearStart {
 ////////////////////////////////////////////////////////////////////////
 // NEAREND
 
-/// The [NearEnd] rule specifies that one or more plugins should appear as near as possible to the End of the load order.
+/// The [`NearEnd`] rule specifies that one or more plugins should appear as near as possible to the End of the load order.
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct NearEnd {
     pub names: Vec<String>,
 }
 impl NearEnd {
-    pub fn new(names: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(names: Vec<String>) -> Self {
         Self { names }
     }
 }
-impl TParser<NearEnd> for NearEnd {
+impl TParser<Self> for NearEnd {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut NearEnd,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -386,10 +394,10 @@ impl TParser<NearEnd> for NearEnd {
 impl Display for EWarningRule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EWarningRule::Note(x) => x.fmt(f),
-            EWarningRule::Conflict(x) => x.fmt(f),
-            EWarningRule::Requires(x) => x.fmt(f),
-            EWarningRule::Patch(x) => x.fmt(f),
+            Self::Note(x) => x.fmt(f),
+            Self::Conflict(x) => x.fmt(f),
+            Self::Requires(x) => x.fmt(f),
+            Self::Patch(x) => x.fmt(f),
         }
     }
 }
@@ -408,6 +416,7 @@ pub struct Note {
 }
 
 impl Note {
+    #[must_use]
     pub fn new(comment: String, expressions: &[Expression]) -> Self {
         Self {
             comment,
@@ -443,9 +452,9 @@ impl TWarningRule for Note {
         result
     }
 }
-impl TParser<Note> for Note {
+impl TParser<Self> for Note {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut Note,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -469,9 +478,9 @@ impl Display for Note {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut block = format!("[NOTE]\n\t{}\n", self.comment);
         for e in &self.expressions {
-            block += format!("{}\n", e).as_str();
+            block += format!("{e}\n").as_str();
         }
-        write!(f, "{}", block)
+        write!(f, "{block}")
     }
 }
 
@@ -489,6 +498,7 @@ pub struct Conflict {
     pub conflicts: Vec<Vec<String>>,
 }
 impl Conflict {
+    #[must_use]
     pub fn new(comment: String, expressions: &[Expression]) -> Self {
         Self {
             comment,
@@ -526,9 +536,9 @@ impl TWarningRule for Conflict {
         i > 1
     }
 }
-impl TParser<Conflict> for Conflict {
+impl TParser<Self> for Conflict {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut Conflict,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -550,9 +560,9 @@ impl Display for Conflict {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut block = format!("[CONFLICT]\n\t{}\n", self.comment);
         for e in &self.expressions {
-            block += format!("{}\n", e).as_str();
+            block += format!("{e}\n").as_str();
         }
-        write!(f, "{}", block)
+        write!(f, "{block}")
     }
 }
 
@@ -570,7 +580,8 @@ pub struct Requires {
     pub plugins: Vec<String>,
 }
 impl Requires {
-    pub fn new(comment: String, expression_a: Expression, expression_b: Expression) -> Self {
+    #[must_use]
+    pub const fn new(comment: String, expression_a: Expression, expression_b: Expression) -> Self {
         Self {
             comment,
             expression_a: Some(expression_a),
@@ -617,9 +628,9 @@ impl TWarningRule for Requires {
     }
 }
 
-impl TParser<Requires> for Requires {
+impl TParser<Self> for Requires {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut Requires,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -647,12 +658,12 @@ impl Display for Requires {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut block = format!("[REQUIRES]\n\t{}\n", self.comment);
         if let Some(a) = &self.expression_a {
-            block += format!("{}\n", a).as_str();
+            block += format!("{a}\n").as_str();
         }
         if let Some(b) = &self.expression_b {
-            block += format!("{}\n", b).as_str();
+            block += format!("{b}\n").as_str();
         }
-        write!(f, "{}", block)
+        write!(f, "{block}")
     }
 }
 
@@ -671,7 +682,8 @@ pub struct Patch {
     pub plugins: Vec<String>,
 }
 impl Patch {
-    pub fn new(comment: String, expression_a: Expression, expression_b: Expression) -> Self {
+    #[must_use]
+    pub const fn new(comment: String, expression_a: Expression, expression_b: Expression) -> Self {
         Self {
             comment,
             expression_a: Some(expression_a),
@@ -718,9 +730,9 @@ impl TWarningRule for Patch {
     }
 }
 
-impl TParser<Patch> for Patch {
+impl TParser<Self> for Patch {
     fn parse<R: Read + BufRead + Seek>(
-        this: &mut Patch,
+        this: &mut Self,
         reader: R,
         parser: &parser::Parser,
     ) -> Result<()> {
@@ -748,11 +760,11 @@ impl Display for Patch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut block = format!("[PATCH]\n\t{}\n", self.comment);
         if let Some(a) = &self.expression_a {
-            block += format!("{}\n", a).as_str();
+            block += format!("{a}\n").as_str();
         }
         if let Some(b) = &self.expression_b {
-            block += format!("{}\n", b).as_str();
+            block += format!("{b}\n").as_str();
         }
-        write!(f, "{}", block)
+        write!(f, "{block}")
     }
 }

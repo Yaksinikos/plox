@@ -78,21 +78,21 @@ mod unit_tests {
             Ok(result) => {
                 assert!(check_order(&result, &order), "stable(true) order is wrong");
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
 
         match new_stable_full_sorter().topo_sort(ESupportedGame::Morrowind, &mods, &order, &[]) {
             Ok(result) => {
                 assert!(check_order(&result, &order), "stable(true) order is wrong");
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
 
         match sorter::new_stable_sorter().topo_sort(ESupportedGame::Morrowind, &mods, &order, &[]) {
             Ok(result) => {
                 assert!(check_order(&result, &order), "stable(true) order is wrong");
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
     }
 }

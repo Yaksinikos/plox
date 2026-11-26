@@ -15,11 +15,13 @@ pub enum ESortType {
     StableFull,
 }
 
-pub fn new_unstable_sorter() -> Sorter {
+#[must_use]
+pub const fn new_unstable_sorter() -> Sorter {
     Sorter::new(ESortType::Unstable, 0)
 }
 
-pub fn new_stable_sorter() -> Sorter {
+#[must_use]
+pub const fn new_stable_sorter() -> Sorter {
     Sorter::new(ESortType::StableOpt, 100)
 }
 
@@ -35,7 +37,8 @@ pub struct Sorter {
 }
 
 impl Sorter {
-    pub fn new(sort_type: ESortType, max_iterations: usize) -> Self {
+    #[must_use]
+    pub const fn new(sort_type: ESortType, max_iterations: usize) -> Self {
         Self {
             sort_type,
             max_iterations,
@@ -89,7 +92,7 @@ impl Sorter {
             let mut result = vec![];
             for idx in sort {
                 let plugin = &plugins[idx.index()];
-                result.push(plugin.name.to_owned());
+                result.push(plugin.name.clone());
             }
             return Ok(result);
         }
@@ -191,9 +194,9 @@ impl Sorter {
                 // map sorted index back to mods
                 let mut result = vec![];
                 for lower_case_name in mods {
-                    let idx = index_dict[&lower_case_name.clone()];
+                    let idx = index_dict[&lower_case_name];
                     let plugin = &plugins[idx];
-                    result.push(plugin.name.to_owned());
+                    result.push(plugin.name.clone());
                 }
                 return Ok(result);
             }
@@ -201,9 +204,9 @@ impl Sorter {
             if let Some(edge) = edges.get(index) {
                 let resolved_0 = &index_dict_rev[&edge.0];
                 let resolved_1 = &index_dict_rev[&edge.1];
-                log::debug!("{}, index {} ({}, {})", i, index, resolved_0, resolved_1);
+                log::debug!("{i}, index {index} ({resolved_0}, {resolved_1})");
             } else {
-                log::debug!("{}, index {}", i, index);
+                log::debug!("{i}, index {index}");
             }
         }
 
@@ -212,7 +215,7 @@ impl Sorter {
             let viz = petgraph::dot::Dot::with_config(&g, &[petgraph::dot::Config::EdgeNoLabel]);
             // write to file
             let mut file = std::fs::File::create(GRAPH_FILE).expect("file create failed");
-            std::io::Write::write_all(&mut file, format!("{:?}", viz).as_bytes())
+            std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes())
                 .expect("write failed");
         }
 
@@ -252,7 +255,7 @@ impl Sorter {
                 let x = index_dict[result[i].as_str()];
                 let y = index_dict[result[j].as_str()];
                 if edges.contains(&(x, y)) {
-                    let t = result[i].to_owned();
+                    let t = result[i].clone();
                     result.remove(i);
                     result.insert(j, t);
 
@@ -286,7 +289,7 @@ impl Sorter {
 
             // if i not before j x should be before y
             if idx_of_x > idx_of_y {
-                let t = result[idx_of_x].to_owned();
+                let t = result[idx_of_x].clone();
                 result.remove(idx_of_x);
                 result.insert(idx_of_y, t);
 
@@ -303,6 +306,7 @@ impl Sorter {
     }
 }
 
+#[must_use]
 pub fn get_graph_data(
     plugins: &[PluginData],
     order_rules: &[EOrderRule],
@@ -317,7 +321,7 @@ pub fn get_graph_data(
         let lower_case = plugin_data.name.to_lowercase();
 
         index_dict.insert(lower_case.clone(), i);
-        index_dict_rev.insert(i, lower_case.clone());
+        index_dict_rev.insert(i, lower_case);
 
         plugin_map.insert(i, plugin_data.to_owned());
     }
@@ -338,7 +342,7 @@ pub fn get_graph_data(
             for i in &results_for_a {
                 for j in &results_for_b {
                     if i == j {
-                        warn!("Skipping circular edge: {}", i);
+                        warn!("Skipping circular edge: {i}");
                         continue;
                     }
                     let idx_a = index_dict[i.as_str()];
@@ -353,7 +357,7 @@ pub fn get_graph_data(
     }
 
     // add edges from masters
-    for mod_data in plugins.iter() {
+    for mod_data in plugins {
         // add an edge from the mod to all its masters
         let idx = index_dict[&mod_data.name.to_lowercase()];
         if let Some(masters) = &mod_data.masters {
@@ -380,6 +384,7 @@ pub fn get_graph_data(
     }
 }
 
+#[must_use]
 pub fn build_graph(data: &GraphData) -> StableGraph<String, ()> {
     let GraphData {
         index_dict_rev,
@@ -394,7 +399,7 @@ pub fn build_graph(data: &GraphData) -> StableGraph<String, ()> {
         g.add_node(name);
     }
     // add edges
-    for edge in edges.iter() {
+    for edge in edges {
         g.add_edge(NodeIndex::new(edge.0), NodeIndex::new(edge.1), ());
     }
 

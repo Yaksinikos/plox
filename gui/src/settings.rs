@@ -33,6 +33,7 @@ pub struct AppSettings {
 }
 
 impl AppSettings {
+    #[must_use]
     pub fn from_file(path: &Path) -> Self {
         match std::fs::read_to_string(path) {
             Ok(s) => match toml::from_str(&s) {

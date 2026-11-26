@@ -653,7 +653,7 @@ mod unit_tests {
 
         if let Expression::VER(e) = expr {
             assert_eq!(format!("{}", e.operator), expected[0]);
-            assert_eq!(format!("{}", e.version), expected[1]);
+            assert_eq!(e.version.to_string(), expected[1]);
             assert!(is_atomic(&e.expression.into(), expected[2]));
         } else {
             panic!("wrong type");

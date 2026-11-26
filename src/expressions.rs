@@ -30,28 +30,28 @@ pub enum Expression {
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Atomic(x) => x.fmt(f),
-            Expression::ALL(x) => x.fmt(f),
-            Expression::ANY(x) => x.fmt(f),
-            Expression::NOT(x) => x.fmt(f),
-            Expression::DESC(x) => x.fmt(f),
-            Expression::SIZE(x) => x.fmt(f),
-            Expression::VER(x) => x.fmt(f),
-            Expression::GVER(x) => x.fmt(f),
+            Self::Atomic(x) => x.fmt(f),
+            Self::ALL(x) => x.fmt(f),
+            Self::ANY(x) => x.fmt(f),
+            Self::NOT(x) => x.fmt(f),
+            Self::DESC(x) => x.fmt(f),
+            Self::SIZE(x) => x.fmt(f),
+            Self::VER(x) => x.fmt(f),
+            Self::GVER(x) => x.fmt(f),
         }
     }
 }
 impl TExpression for Expression {
     fn eval(&self, items: &[PluginData]) -> Option<Vec<String>> {
         match self {
-            Expression::Atomic(x) => x.eval(items),
-            Expression::ALL(x) => x.eval(items),
-            Expression::ANY(x) => x.eval(items),
-            Expression::NOT(x) => x.eval(items),
-            Expression::DESC(x) => x.eval(items),
-            Expression::SIZE(x) => x.eval(items),
-            Expression::VER(x) => x.eval(items),
-            Expression::GVER(x) => x.eval(items),
+            Self::Atomic(x) => x.eval(items),
+            Self::ALL(x) => x.eval(items),
+            Self::ANY(x) => x.eval(items),
+            Self::NOT(x) => x.eval(items),
+            Self::DESC(x) => x.eval(items),
+            Self::SIZE(x) => x.eval(items),
+            Self::VER(x) => x.eval(items),
+            Self::GVER(x) => x.eval(items),
         }
     }
 }
@@ -59,42 +59,42 @@ impl TExpression for Expression {
 // conversions
 impl From<Atomic> for Expression {
     fn from(val: Atomic) -> Self {
-        Expression::Atomic(val)
+        Self::Atomic(val)
     }
 }
 impl From<ALL> for Expression {
     fn from(val: ALL) -> Self {
-        Expression::ALL(val)
+        Self::ALL(val)
     }
 }
 impl From<ANY> for Expression {
     fn from(val: ANY) -> Self {
-        Expression::ANY(val)
+        Self::ANY(val)
     }
 }
 impl From<NOT> for Expression {
     fn from(val: NOT) -> Self {
-        Expression::NOT(val)
+        Self::NOT(val)
     }
 }
 impl From<DESC> for Expression {
     fn from(val: DESC) -> Self {
-        Expression::DESC(val)
+        Self::DESC(val)
     }
 }
 impl From<SIZE> for Expression {
     fn from(val: SIZE) -> Self {
-        Expression::SIZE(val)
+        Self::SIZE(val)
     }
 }
 impl From<VER> for Expression {
     fn from(val: VER) -> Self {
-        Expression::VER(val)
+        Self::VER(val)
     }
 }
 impl From<GVER> for Expression {
     fn from(val: GVER) -> Self {
-        Expression::GVER(val)
+        Self::GVER(val)
     }
 }
 
@@ -113,15 +113,16 @@ pub struct Atomic {
 }
 
 impl Atomic {
+    #[must_use]
     pub fn get_item(&self) -> String {
-        self.item.to_owned()
+        self.item.clone()
     }
 }
 impl TExpression for Atomic {
     /// atomics evaluate as true if the input list contains the item
     fn eval(&self, items: &[PluginData]) -> Option<Vec<String>> {
         wild_contains(
-            &items.iter().map(|f| f.name.to_owned()).collect::<Vec<_>>(),
+            &items.iter().map(|f| f.name.clone()).collect::<Vec<_>>(),
             &self.item,
         )
     }
@@ -129,12 +130,12 @@ impl TExpression for Atomic {
 
 impl From<&str> for Atomic {
     fn from(value: &str) -> Self {
-        Atomic { item: value.into() }
+        Self { item: value.into() }
     }
 }
 impl From<String> for Atomic {
     fn from(value: String) -> Self {
-        Atomic { item: value }
+        Self { item: value }
     }
 }
 
@@ -154,7 +155,8 @@ pub struct ALL {
     pub expressions: Vec<Expression>,
 }
 impl ALL {
-    pub fn new(expressions: Vec<Expression>) -> Self {
+    #[must_use]
+    pub const fn new(expressions: Vec<Expression>) -> Self {
         Self { expressions }
     }
 }
@@ -184,7 +186,7 @@ impl Display for ALL {
             "[ALL {}]",
             self.expressions
                 .iter()
-                .map(|x| x.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
                 .join("\n\t")
         )
@@ -201,7 +203,8 @@ pub struct ANY {
     pub expressions: Vec<Expression>,
 }
 impl ANY {
-    pub fn new(expressions: Vec<Expression>) -> Self {
+    #[must_use]
+    pub const fn new(expressions: Vec<Expression>) -> Self {
         Self { expressions }
     }
 }
@@ -229,7 +232,7 @@ impl Display for ANY {
             "[ANY {}]",
             self.expressions
                 .iter()
-                .map(|x| x.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
                 .join("\n\t")
         )
@@ -246,6 +249,7 @@ pub struct NOT {
     pub expression: Box<Expression>,
 }
 impl NOT {
+    #[must_use]
     pub fn new(expression: Expression) -> Self {
         Self {
             expression: Box::new(expression),
@@ -289,7 +293,8 @@ pub struct DESC {
     pub is_negated: bool,
 }
 impl DESC {
-    pub fn new(expression: Atomic, regex: String, is_negated: bool) -> Self {
+    #[must_use]
+    pub const fn new(expression: Atomic, regex: String, is_negated: bool) -> Self {
         Self {
             expression,
             regex,
@@ -307,25 +312,19 @@ impl TExpression for DESC {
                     && let Ok(pattern) = regex::Regex::new(&self.regex)
                 {
                     let description = &description.to_lowercase();
-                    match self.is_negated {
-                        true => {
-                            if !pattern.is_match(description) {
-                                results.push(p.name.clone());
-                            }
+                    if self.is_negated {
+                        if !pattern.is_match(description) {
+                            results.push(p.name.clone());
                         }
-                        false => {
-                            if pattern.is_match(description) {
-                                results.push(p.name.clone());
-                            }
-                        }
+                    } else if pattern.is_match(description) {
+                        results.push(p.name.clone());
                     }
                 }
             }
             if results.is_empty() {
                 return None;
-            } else {
-                return Some(results);
             }
+            return Some(results);
         }
         None
     }
@@ -362,7 +361,8 @@ pub struct SIZE {
     pub is_negated: bool,
 }
 impl SIZE {
-    pub fn new(expression: Atomic, size: u64, is_negated: bool) -> Self {
+    #[must_use]
+    pub const fn new(expression: Atomic, size: u64, is_negated: bool) -> Self {
         Self {
             expression,
             size,
@@ -386,9 +386,8 @@ impl TExpression for SIZE {
             }
             if results.is_empty() {
                 return None;
-            } else {
-                return Some(results);
             }
+            return Some(results);
         }
         None
     }
@@ -426,9 +425,9 @@ pub enum EVerOperator {
 impl Display for EVerOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EVerOperator::Less => write!(f, "<"),
-            EVerOperator::Equal => write!(f, "="),
-            EVerOperator::Greater => write!(f, ">"),
+            Self::Less => write!(f, "<"),
+            Self::Equal => write!(f, "="),
+            Self::Greater => write!(f, ">"),
         }
     }
 }
@@ -444,7 +443,8 @@ pub struct VER {
     pub version: String,
 }
 impl VER {
-    pub fn new(expression: Atomic, operator: EVerOperator, version: String) -> Self {
+    #[must_use]
+    pub const fn new(expression: Atomic, operator: EVerOperator, version: String) -> Self {
         Self {
             expression,
             operator,
@@ -463,18 +463,15 @@ impl TExpression for VER {
                     let semversion = semver::Version::parse(&self.version).unwrap();
                     let matches = match self.operator {
                         EVerOperator::Less => {
-                            let req =
-                                VersionReq::parse(format!("<{}", semversion).as_str()).unwrap();
+                            let req = VersionReq::parse(format!("<{semversion}").as_str()).unwrap();
                             req.matches(plugin_version)
                         }
                         EVerOperator::Equal => {
-                            let req =
-                                VersionReq::parse(format!("={}", semversion).as_str()).unwrap();
+                            let req = VersionReq::parse(format!("={semversion}").as_str()).unwrap();
                             req.matches(plugin_version)
                         }
                         EVerOperator::Greater => {
-                            let req =
-                                VersionReq::parse(format!(">{}", semversion).as_str()).unwrap();
+                            let req = VersionReq::parse(format!(">{semversion}").as_str()).unwrap();
                             req.matches(plugin_version)
                         }
                     };
@@ -486,9 +483,8 @@ impl TExpression for VER {
             }
             if results.is_empty() {
                 return None;
-            } else {
-                return Some(results);
             }
+            return Some(results);
         }
         None
     }
@@ -528,9 +524,9 @@ pub enum EGVerOperator {
 impl Display for EGVerOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EGVerOperator::Less => write!(f, "<"),
-            EGVerOperator::Equal => write!(f, "="),
-            EGVerOperator::Greater => write!(f, ">"),
+            Self::Less => write!(f, "<"),
+            Self::Equal => write!(f, "="),
+            Self::Greater => write!(f, ">"),
         }
     }
 }
@@ -545,7 +541,8 @@ pub struct GVER {
     pub version: String,
 }
 impl GVER {
-    pub fn new(expression: Atomic, operator: EGVerOperator, version: String) -> Self {
+    #[must_use]
+    pub const fn new(expression: Atomic, operator: EGVerOperator, version: String) -> Self {
         Self {
             expression,
             operator,
@@ -564,18 +561,15 @@ impl TExpression for GVER {
                     let semversion = semver::Version::parse(&self.version).unwrap();
                     let matches = match self.operator {
                         EGVerOperator::Less => {
-                            let req =
-                                VersionReq::parse(format!("<{}", semversion).as_str()).unwrap();
+                            let req = VersionReq::parse(format!("<{semversion}").as_str()).unwrap();
                             req.matches(game_version)
                         }
                         EGVerOperator::Equal => {
-                            let req =
-                                VersionReq::parse(format!("={}", semversion).as_str()).unwrap();
+                            let req = VersionReq::parse(format!("={semversion}").as_str()).unwrap();
                             req.matches(game_version)
                         }
                         EGVerOperator::Greater => {
-                            let req =
-                                VersionReq::parse(format!(">{}", semversion).as_str()).unwrap();
+                            let req = VersionReq::parse(format!(">{semversion}").as_str()).unwrap();
                             req.matches(game_version)
                         }
                     };
@@ -587,9 +581,8 @@ impl TExpression for GVER {
             }
             if results.is_empty() {
                 return None;
-            } else {
-                return Some(results);
             }
+            return Some(results);
         }
         None
     }

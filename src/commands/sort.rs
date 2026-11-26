@@ -3,7 +3,11 @@ use std::{env, path::PathBuf};
 
 use log::{debug, error, info, warn};
 
-use crate::*;
+use crate::{
+    ESupportedGame, EWarningRule, PluginData, TParser, TWarningRule, download_latest_rules,
+    gather_cp77_mods, gather_openmw_mods, gather_tes3_mods, get_default_rules_dir,
+    get_game_version, parser, read_file_as_list, sorter, update_new_load_order,
+};
 
 pub struct CliSortOptions {
     pub game: ESupportedGame,
@@ -27,7 +31,7 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
 
     // get game root
     let root = match root {
-        Some(path) => path.clone(),
+        Some(path) => path,
         None => env::current_dir().expect("No current working dir"),
     };
 
@@ -38,10 +42,10 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
         get_default_rules_dir(game)
     };
 
-    if !no_download {
-        download_latest_rules(game, &rules_dir);
+    if no_download {
+        info!("Skipping downloading latest rules");
     } else {
-        info!("Skipping downloading latest rules")
+        download_latest_rules(game, &rules_dir);
     }
 
     let game_version = get_game_version(game);
@@ -64,7 +68,7 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
 
     let mut parser = parser::get_parser(game, game_version);
     if let Err(e) = parser.parse(rules_dir) {
-        error!("Parser init failed: {}", e);
+        error!("Parser init failed: {e}");
         return ExitCode::FAILURE;
     }
 
@@ -73,7 +77,7 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
         warn!("No rules found to evaluate");
     } else {
         info!("Evaluating mod list...\n");
-        debug!("{:?}", &mods);
+        debug!("{mods:?}");
 
         parser.evaluate_plugins(&mods);
         for warning in parser.warnings {
@@ -127,8 +131,8 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
                 if dry_run {
                     info!("Dry run...");
 
-                    debug!("Old:\n{:?}", &mods);
-                    debug!("New:\n{:?}", result);
+                    debug!("Old:\n{mods:?}");
+                    debug!("New:\n{result:?}");
 
                     if mods
                         .iter()
@@ -138,12 +142,12 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
                     {
                         info!("Mods are in correct order, no sorting needed.");
                     } else {
-                        info!("New order:\n{:?}", result);
+                        info!("New order:\n{result:?}");
                     }
 
                     ExitCode::SUCCESS
                 } else {
-                    info!("Current:\n{:?}", &mods);
+                    info!("Current:\n{mods:?}");
 
                     if mods
                         .iter()
@@ -154,15 +158,15 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
                         info!("Mods are in correct order, no sorting needed.");
                         ExitCode::SUCCESS
                     } else {
-                        info!("New:\n{:?}", result);
+                        info!("New:\n{result:?}");
 
                         match update_new_load_order(game, &result) {
-                            Ok(_) => {
+                            Ok(()) => {
                                 info!("Update successful");
                                 ExitCode::SUCCESS
                             }
                             Err(e) => {
-                                error!("Could not updae load order: {}", e);
+                                error!("Could not updae load order: {e}");
                                 ExitCode::FAILURE
                             }
                         }

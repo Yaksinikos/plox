@@ -24,7 +24,7 @@ mod integration_tests {
     fn clean_mods(plugins: &[PluginData], warning_rules: &[EWarningRule]) -> Vec<PluginData> {
         let mut mods_to_remove = vec![];
         let mut warning_rules = warning_rules.to_vec();
-        for rule in warning_rules.iter_mut() {
+        for rule in &mut warning_rules {
             // only conflict rules
             if let EWarningRule::Conflict(conflict) = rule
                 && conflict.eval(plugins)
@@ -49,8 +49,8 @@ mod integration_tests {
 
         // log
         warn!("removing mods: {:?}", mods_to_remove.len());
-        for mod_name in mods_to_remove.iter() {
-            warn!("\t{}", mod_name);
+        for mod_name in &mods_to_remove {
+            warn!("\t{mod_name}");
         }
 
         // remove mods
@@ -67,10 +67,7 @@ mod integration_tests {
         let mods_path = "./tests/modlist.txt";
         let mods_data = read_file_as_list(mods_path, &None);
         assert_eq!(
-            mods_data
-                .iter()
-                .map(|s| s.name.to_owned())
-                .collect::<Vec<_>>(),
+            mods_data.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
             vec![
                 "a.archive",
                 "b.archive",
@@ -78,7 +75,7 @@ mod integration_tests {
                 "d.archive",
                 "e.archive"
             ]
-        )
+        );
     }
 
     #[test]
@@ -106,7 +103,7 @@ mod integration_tests {
                     "stable(true) order is wrong"
                 );
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
 
         match new_stable_sorter().topo_sort(
@@ -121,7 +118,7 @@ mod integration_tests {
                     "stable(true) order is wrong"
                 );
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
     }
 
@@ -222,7 +219,7 @@ mod integration_tests {
                 let mut file =
                     std::fs::File::create("tmp/base_rules.txt").expect("file create failed");
                 for rule in parser.warning_rules {
-                    writeln!(file, "{}", rule).expect("could not write to file");
+                    writeln!(file, "{rule}").expect("could not write to file");
                 }
             }
         }
@@ -236,7 +233,7 @@ mod integration_tests {
                 let mut file =
                     std::fs::File::create("tmp/user_rules.txt").expect("file create failed");
                 for rule in parser.warning_rules {
-                    writeln!(file, "{}", rule).expect("could not write to file");
+                    writeln!(file, "{rule}").expect("could not write to file");
                 }
             }
 
@@ -265,7 +262,7 @@ mod integration_tests {
             // write to file
             let _ = std::fs::create_dir_all("tmp");
             let mut file = std::fs::File::create("tmp/graphviz.dot").expect("file create failed");
-            std::io::Write::write_all(&mut file, format!("{:?}", viz).as_bytes())
+            std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes())
                 .expect("write failed");
         }
 
@@ -298,7 +295,7 @@ mod integration_tests {
                 );
             }
             Err(e) => {
-                panic!("Error: {}", e)
+                panic!("Error: {e}")
             }
         }
 
@@ -330,7 +327,7 @@ mod integration_tests {
                     "stable(true) order is wrong"
                 );
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
 
         Ok(())
@@ -362,7 +359,7 @@ mod integration_tests {
                 );
             }
             Err(e) => {
-                panic!("Error: {}", e)
+                panic!("Error: {e}")
             }
         }
 
@@ -394,7 +391,7 @@ mod integration_tests {
                     "stable(true) order is wrong"
                 );
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
 
         Ok(())
@@ -428,7 +425,7 @@ mod integration_tests {
                 );
             }
             Err(e) => {
-                panic!("Error: {}", e)
+                panic!("Error: {e}")
             }
         }
 
@@ -462,7 +459,7 @@ mod integration_tests {
                     "stable(true) order is wrong"
                 );
             }
-            Err(e) => panic!("Error: {}", e),
+            Err(e) => panic!("Error: {e}"),
         }
 
         Ok(())
@@ -533,7 +530,7 @@ mod integration_tests {
 
         let mut msg = String::new();
         for (n, t) in &times {
-            msg += format!("{},{}\n", n, t).as_str();
+            msg += format!("{n},{t}\n").as_str();
         }
 
         // log to file
@@ -556,13 +553,13 @@ mod integration_tests {
 
         let mods = gather_mods(&root_path, ESupportedGame::Cyberpunk, &None);
         assert_eq!(
-            mods.iter().map(|s| s.name.to_owned()).collect::<Vec<_>>(),
+            mods.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
             vec![
                 "a.archive".to_owned(),
                 "b.archive".into(),
                 "c.archive".into()
             ]
-        )
+        );
     }
 
     #[test]

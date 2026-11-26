@@ -20,7 +20,10 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use ini::Ini;
 use log::{error, info, warn};
 use regex::Regex;
-use rules::*;
+use rules::{
+    Conflict, EOrderRule, ERule, EWarningRule, NearEnd, NearStart, Note, Order, Patch, Requires,
+    TParser, TWarningRule,
+};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +37,7 @@ pub enum ELogLevel {
     Error,
 }
 
+#[must_use]
 pub fn log_level_to_str(level: ELogLevel) -> String {
     match level {
         ELogLevel::Trace => "trace".into(),
@@ -58,6 +62,7 @@ pub const GRAPH_FILE: &str = "graphviz.dot";
 ////////////////////////////////////////////////////////////////////////
 
 /// Detect game from current working directory
+#[must_use]
 pub fn detect_game() -> Option<ESupportedGame> {
     if PathBuf::from("Morrowind.exe").exists() {
         Some(ESupportedGame::Morrowind)
@@ -93,6 +98,7 @@ fn read_pe_version(path: &PathBuf) -> Option<String> {
 }
 
 /// Detect game from current working directory and read version from exe
+#[must_use]
 pub fn get_game_version(game: ESupportedGame) -> Option<String> {
     match game {
         ESupportedGame::Morrowind => None,
@@ -108,14 +114,16 @@ pub fn get_game_version(game: ESupportedGame) -> Option<String> {
 }
 
 /// flattens a list of ordered mod pairs into a list of mod names
+#[must_use]
 pub fn debug_get_mods_from_order_rules(order_rules: &[EOrderRule]) -> Vec<PluginData> {
     debug_get_mods_from_ordering(&get_ordering_from_order_rules(order_rules))
 }
 
 /// flattens a list of ordered mod pairs into a list of mod names
+#[must_use]
 pub fn debug_get_mods_from_ordering(order: &[(String, String)]) -> Vec<PluginData> {
     let mut result: Vec<PluginData> = vec![];
-    for (a, b) in order.iter() {
+    for (a, b) in order {
         for a in [a, b] {
             let name = if a.contains('*') || a.contains('?') || a.contains("<ver>") {
                 // Wildcards
@@ -143,6 +151,7 @@ pub fn debug_get_mods_from_ordering(order: &[(String, String)]) -> Vec<PluginDat
 /// # Errors
 ///
 /// This function will return an error if .
+#[must_use]
 pub fn get_default_rules_dir(game: ESupportedGame) -> PathBuf {
     match game {
         ESupportedGame::Morrowind | ESupportedGame::Openmw => PathBuf::from("mlox"),
@@ -205,7 +214,7 @@ where
 
 fn download_mlox_rules(rules_dir: &PathBuf) {
     match fs::create_dir_all(rules_dir) {
-        Ok(_) => {
+        Ok(()) => {
             // download
             let repo = "https://github.com/DanaePlays/mlox-rules/raw/main/";
             let files = ["mlox_base.txt", "mlox_user.txt"];
@@ -214,7 +223,7 @@ fn download_mlox_rules(rules_dir: &PathBuf) {
                 let url = repo.to_owned() + file;
                 match download_file(&url, &output_path) {
                     Ok(()) => {}
-                    Err(err) => error!("Error downloading file: {}", err),
+                    Err(err) => error!("Error downloading file: {err}"),
                 }
             }
         }
@@ -230,7 +239,7 @@ fn download_mlox_rules(rules_dir: &PathBuf) {
 
 fn download_plox_rules(rules_dir: &PathBuf) {
     match fs::create_dir_all(rules_dir) {
-        Ok(_) => {
+        Ok(()) => {
             // download
             let repo = "https://github.com/rfuzzo/cmop-rules/raw/main/";
             let files = ["plox_base.txt"];
@@ -239,7 +248,7 @@ fn download_plox_rules(rules_dir: &PathBuf) {
                 let url = repo.to_owned() + file;
                 match download_file(&url, &output_path) {
                     Ok(()) => {}
-                    Err(err) => error!("Error downloading file: {}", err),
+                    Err(err) => error!("Error downloading file: {err}"),
                 }
             }
         }
@@ -253,7 +262,7 @@ fn download_plox_rules(rules_dir: &PathBuf) {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct PluginData {
     pub name: String,
     pub size: u64,
@@ -265,7 +274,8 @@ pub struct PluginData {
 }
 
 impl PluginData {
-    pub fn new(name: String, size: u64) -> Self {
+    #[must_use]
+    pub const fn new(name: String, size: u64) -> Self {
         Self {
             name,
             size,
@@ -367,7 +377,7 @@ where
                 let mods_in_ini: Vec<_> = section.iter().map(|f| f.1).collect();
                 for data in names {
                     if mods_in_ini.contains(&data.name.as_str()) {
-                        final_files.push(data.clone());
+                        final_files.push(data);
                     }
                 }
 
@@ -387,6 +397,7 @@ where
     names
 }
 
+#[must_use]
 pub fn gather_openmw_mods() -> Vec<PluginData> {
     // parse cfg
     if let Ok(cfg) = openmw_cfg::get_config() {
@@ -420,7 +431,7 @@ fn map_data(f: &Path) -> Option<PluginData> {
             Err(e) => {
                 log::debug!("Error parsing header: {}, {}", e, f.display());
             }
-        };
+        }
 
         // parse semver
         if let Some(version) = get_version(file_name, &data.description) {
@@ -435,6 +446,7 @@ fn map_data(f: &Path) -> Option<PluginData> {
 const VERSION_REGEX: &str = r"(\d+(?:[_.-]?\d+)*[a-zA-Z]?)";
 
 /// Get version from filename or description
+#[must_use]
 pub fn get_version(file_name: &str, description: &Option<String>) -> Option<Version> {
     let mut final_version_str = None;
 
@@ -470,7 +482,7 @@ fn get_semver(version: &str) -> Option<Version> {
     match lenient_semver::parse(&formatted_version) {
         Ok(v) => return Some(v),
         Err(e) => {
-            log::debug!("Error parsing version: {}", e);
+            log::debug!("Error parsing version: {e}");
         }
     }
     None
@@ -482,7 +494,7 @@ fn get_semver(version: &str) -> Option<Version> {
 ///
 /// Panics if the regex pattern is invalid
 fn match_filename_version(file_name: &str) -> Option<String> {
-    let filename_version_regex = format!(r"\D{}\D*", VERSION_REGEX);
+    let filename_version_regex = format!(r"\D{VERSION_REGEX}\D*");
     let pattern: Regex = Regex::new(filename_version_regex.as_str()).unwrap();
     if let Some(captures) = pattern.captures(file_name)
         && let Some(version) = captures.get(1)
@@ -498,7 +510,7 @@ fn match_filename_version(file_name: &str) -> Option<String> {
 ///
 /// Panics if the regex pattern is invalid
 fn match_desc_version(desc: &str) -> Option<String> {
-    let header_version_regex = format!(r"\b(?:version\b\D+|v(?:er)?\.?\s*){}", VERSION_REGEX);
+    let header_version_regex = format!(r"\b(?:version\b\D+|v(?:er)?\.?\s*){VERSION_REGEX}");
     let pattern: Regex = Regex::new(header_version_regex.as_str()).unwrap();
     if let Some(captures) = pattern.captures(desc)
         && let Some(version) = captures.get(1)
@@ -530,7 +542,7 @@ where
         if let Ok(v) = lenient_semver::parse(version) {
             game_version_semver = Some(v);
         } else {
-            error!("Invalid game version: {}", version);
+            error!("Invalid game version: {version}");
         }
     }
 
@@ -554,13 +566,13 @@ where
             for name in lines {
                 let file_name = archive_path.join(name);
                 if mods.contains(&file_name) {
-                    final_order.push(file_name.to_owned());
+                    final_order.push(file_name);
                 }
             }
             // add remaining mods last
-            for m in mods.iter() {
+            for m in &mods {
                 if !final_order.contains(m) {
-                    final_order.push(m.to_path_buf());
+                    final_order.push(m.clone());
                 }
             }
         } else {
@@ -625,12 +637,12 @@ fn update_openmw(result: &[String]) -> std::io::Result<()> {
             if line.starts_with("content=") {
                 continue;
             }
-            writeln!(buf, "{}", line)?;
+            writeln!(buf, "{line}")?;
         }
 
         // add filenames
         for r in result {
-            writeln!(buf, "content={}", r)?;
+            writeln!(buf, "content={r}")?;
         }
 
         // save
@@ -662,13 +674,13 @@ pub fn update_tes3<P: AsRef<Path>>(
             if line.starts_with("GameFile") {
                 continue;
             }
-            writeln!(buf, "{}", line)?;
+            writeln!(buf, "{line}")?;
         }
 
         // add filenames
         writeln!(buf, "[Game Files]")?;
         for (i, r) in result.iter().enumerate() {
-            writeln!(buf, "GameFile{}={}", i, r)?;
+            writeln!(buf, "GameFile{i}={r}")?;
         }
 
         // save
@@ -691,6 +703,7 @@ pub fn update_tes3<P: AsRef<Path>>(
 }
 
 /// Checks if the list of mods is in the correct order
+#[must_use]
 pub fn check_order(result: &[String], order_rules: &[EOrderRule]) -> bool {
     let order = get_ordering_from_order_rules(order_rules);
     let pairs = order;
@@ -744,7 +757,7 @@ pub fn parse_header(f: &Path) -> std::io::Result<Tes3Header> {
     reader.read_exact(&mut header_buffer)?;
 
     let mut reader = std::io::Cursor::new(header_buffer);
-    let header = parse_hedr(&mut reader, header_size as u64)?;
+    let header = parse_hedr(&mut reader, u64::from(header_size))?;
     Ok(header)
 }
 
@@ -881,13 +894,14 @@ fn generate_pair_permutations(input: &[String]) -> Vec<(String, String)> {
     let mut permutations = Vec::new();
     for i in 0..input.len() - 1 {
         for j in i + 1..input.len() {
-            permutations.push((input[i].to_owned(), input[j].to_owned()));
+            permutations.push((input[i].clone(), input[j].clone()));
         }
     }
     permutations
 }
 
 /// Extracts a list of ordering-pairs from the order rules
+#[must_use]
 pub fn get_ordering(rules: &Vec<ERule>) -> Vec<(String, String)> {
     let mut orders: Vec<(String, String)> = vec![];
 
@@ -905,6 +919,7 @@ pub fn get_ordering(rules: &Vec<ERule>) -> Vec<(String, String)> {
 }
 
 /// Extracts a list of ordering-pairs from the order rules
+#[must_use]
 pub fn get_ordering_from_order_rules(rules: &[EOrderRule]) -> Vec<(String, String)> {
     let mut orders: Vec<(String, String)> = vec![];
 
@@ -922,6 +937,7 @@ pub fn get_ordering_from_order_rules(rules: &[EOrderRule]) -> Vec<(String, Strin
 }
 
 /// Extracts a list of ordering-pairs from the order rules
+#[must_use]
 pub fn get_ordering_from_orders(rules: &Vec<Order>) -> Vec<(String, String)> {
     let mut orders: Vec<(String, String)> = vec![];
 
@@ -936,6 +952,7 @@ pub fn get_ordering_from_orders(rules: &Vec<Order>) -> Vec<(String, String)> {
     orders
 }
 
+#[must_use]
 pub fn is_current_directory_name(name_to_check: &str) -> bool {
     // Get the current directory
     if let Ok(current_dir) = env::current_dir() {
@@ -975,7 +992,7 @@ where
         if let Ok(v) = lenient_semver::parse(version) {
             game_version_semver = Some(v);
         } else {
-            error!("Invalid game version: {}", version);
+            error!("Invalid game version: {version}");
         }
     }
 
@@ -997,6 +1014,7 @@ where
 }
 
 /// Checks if the list contains the str
+#[must_use]
 pub fn wild_contains(list: &[String], str: &String) -> Option<Vec<String>> {
     if str.contains('*') || str.contains('?') || str.contains("<ver>") {
         let mut results = vec![];
@@ -1008,7 +1026,7 @@ pub fn wild_contains(list: &[String], str: &String) -> Option<Vec<String>> {
         // the following are valid version numbers: 1.2.3a, 1.0, 1, 1a, 1_3a, 77g
         regex_pattern = regex_pattern.replace("<ver>", r"(\d+(?:[_.-]?\d+)*[a-z]?)");
 
-        regex_pattern = format!("^{}$", regex_pattern);
+        regex_pattern = format!("^{regex_pattern}$");
         if let Ok(regex) = regex::Regex::new(&regex_pattern) {
             for item in list {
                 // Check if the item matches the pattern
@@ -1018,7 +1036,7 @@ pub fn wild_contains(list: &[String], str: &String) -> Option<Vec<String>> {
                 }
             }
         } else {
-            log::error!("Could not construct wildcard pattern for {}", str);
+            log::error!("Could not construct wildcard pattern for {str}");
             return None;
         }
 
@@ -1037,6 +1055,7 @@ pub fn wild_contains(list: &[String], str: &String) -> Option<Vec<String>> {
 }
 
 /// Checks if the list contains the str
+#[must_use]
 pub fn wild_contains_data(list: &[PluginData], str: &str) -> Option<Vec<PluginData>> {
     let str = str.to_lowercase();
     if str.contains('*') || str.contains('?') || str.contains("<ver>") {
@@ -1049,7 +1068,7 @@ pub fn wild_contains_data(list: &[PluginData], str: &str) -> Option<Vec<PluginDa
         // the following are valid version numbers: 1.2.3a, 1.0, 1, 1a, 1_3a, 77g
         regex_pattern = regex_pattern.replace("<ver>", r"(\d+(?:[_.-]?\d+)*[a-z]?)");
 
-        regex_pattern = format!("^{}$", regex_pattern);
+        regex_pattern = format!("^{regex_pattern}$");
         if let Ok(regex) = regex::Regex::new(&regex_pattern) {
             for item in list {
                 // Check if the item matches the pattern
@@ -1059,7 +1078,7 @@ pub fn wild_contains_data(list: &[PluginData], str: &str) -> Option<Vec<PluginDa
                 }
             }
         } else {
-            log::error!("Could not construct wildcard pattern for {}", str);
+            log::error!("Could not construct wildcard pattern for {str}");
             return None;
         }
 
@@ -1077,6 +1096,7 @@ pub fn wild_contains_data(list: &[PluginData], str: &str) -> Option<Vec<PluginDa
     None
 }
 
+#[must_use]
 pub fn note(f: ERule) -> Option<Note> {
     match f {
         ERule::EWarningRule(EWarningRule::Note(n)) => Some(n),
@@ -1084,24 +1104,28 @@ pub fn note(f: ERule) -> Option<Note> {
     }
 }
 
+#[must_use]
 pub fn conflict(f: ERule) -> Option<Conflict> {
     match f {
         ERule::EWarningRule(EWarningRule::Conflict(n)) => Some(n),
         _ => None,
     }
 }
+#[must_use]
 pub fn conflict2(f: &EWarningRule) -> Option<Conflict> {
     match f {
         EWarningRule::Conflict(n) => Some(n.clone()),
         _ => None,
     }
 }
+#[must_use]
 pub fn requires(f: ERule) -> Option<Requires> {
     match f {
         ERule::EWarningRule(EWarningRule::Requires(n)) => Some(n),
         _ => None,
     }
 }
+#[must_use]
 pub fn patch(f: ERule) -> Option<Patch> {
     match f {
         ERule::EWarningRule(EWarningRule::Patch(n)) => Some(n),
@@ -1110,36 +1134,42 @@ pub fn patch(f: ERule) -> Option<Patch> {
 }
 
 // order
+#[must_use]
 pub fn order(f: ERule) -> Option<Order> {
     match f {
         ERule::EOrderRule(EOrderRule::Order(o)) => Some(o),
         _ => None,
     }
 }
+#[must_use]
 pub fn order2(f: EOrderRule) -> Option<Order> {
     match f {
         EOrderRule::Order(o) => Some(o),
         _ => None,
     }
 }
+#[must_use]
 pub fn nearstart(f: ERule) -> Option<NearStart> {
     match f {
         ERule::EOrderRule(EOrderRule::NearStart(o)) => Some(o),
         _ => None,
     }
 }
+#[must_use]
 pub fn nearstart2(f: &EOrderRule) -> Option<NearStart> {
     match f {
         EOrderRule::NearStart(o) => Some(o.clone()),
         _ => None,
     }
 }
+#[must_use]
 pub fn nearend(f: ERule) -> Option<NearEnd> {
     match f {
         ERule::EOrderRule(EOrderRule::NearEnd(o)) => Some(o),
         _ => None,
     }
 }
+#[must_use]
 pub fn nearend2(f: &EOrderRule) -> Option<NearEnd> {
     match f {
         EOrderRule::NearEnd(o) => Some(o.clone()),
@@ -1179,52 +1209,52 @@ mod tests {
 
     #[test]
     fn test_wildcard_matches_star() {
-        let pattern = "Hold it - replacer*.esp".to_lowercase().to_owned();
+        let pattern = "Hold it - replacer*.esp".to_lowercase();
 
         {
-            let input = "Hold it - replacer.esp".to_lowercase().to_owned();
+            let input = "Hold it - replacer.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "Hold it - replacerA.esp".to_lowercase().to_owned();
+            let input = "Hold it - replacerA.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "Hold it - replacerAA.esp".to_lowercase().to_owned();
+            let input = "Hold it - replacerAA.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         // Fails
         {
-            let input = "Hold it - replace.esp".to_lowercase().to_owned();
+            let input = "Hold it - replace.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_none());
         }
     }
 
     #[test]
     fn test_wildcard_matches_questionmark() {
-        let pattern = "Rem_LoC?.esp".to_lowercase().to_owned();
+        let pattern = "Rem_LoC?.esp".to_lowercase();
 
         {
-            let input = "Rem_LoCA.esp".to_lowercase().to_owned();
+            let input = "Rem_LoCA.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "Rem_LoC1.esp".to_lowercase().to_owned();
+            let input = "Rem_LoC1.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         // Fails
         {
-            let input = "Rem_LoCAA.esp".to_lowercase().to_owned();
+            let input = "Rem_LoCAA.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_none());
         }
 
         {
-            let input = "Rem_LoC.esp".to_lowercase().to_owned();
+            let input = "Rem_LoC.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_none());
         }
     }
@@ -1232,51 +1262,51 @@ mod tests {
     #[test]
     fn test_wildcard_matches_ver() {
         // the following are valid version numbers: 1.0, 1.2.3a, 1, 1a, 1_3a, 77g
-        let pattern = "ADN-GDRv<VER>.esp".to_lowercase().to_owned();
+        let pattern = "ADN-GDRv<VER>.esp".to_lowercase();
 
         {
-            let input = "ADN-GDRv1.0.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv1.0.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "ADN-GDRv1.2.3a.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv1.2.3a.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "ADN-GDRv1.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv1.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "ADN-GDRv1a.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv1a.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "ADN-GDRv1_3a.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv1_3a.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         {
-            let input = "ADN-GDRv77g.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv77g.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_some());
         }
 
         // Fails
         {
-            let input = "ADN-GDRv1.0_comment.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv1.0_comment.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_none());
         }
 
         {
-            let input = "ADN-GDRv.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRv.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_none());
         }
 
         {
-            let input = "ADN-GDRvMyE3.esp".to_lowercase().to_owned();
+            let input = "ADN-GDRvMyE3.esp".to_lowercase();
             assert!(wild_contains(&[input], &pattern).is_none());
         }
     }

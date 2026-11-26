@@ -36,26 +36,30 @@ struct UserConfigFile {
 }
 
 /// The plox folder inside the platform config dir
+#[must_use]
 pub fn config_dir() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join(APP_DIR))
 }
 
+#[must_use]
 pub fn config_file() -> Option<PathBuf> {
     config_dir().map(|d| d.join(CONFIG_FILE))
 }
 
 impl RendererConfig {
+    #[must_use]
     pub fn load() -> Self {
         let Some(path) = config_file() else {
             return Self::default();
         };
         match std::fs::read_to_string(&path) {
-            Ok(s) => toml::from_str::<UserConfigFile>(&s)
-                .map(|c| c.renderer)
-                .unwrap_or_else(|e| {
+            Ok(s) => toml::from_str::<UserConfigFile>(&s).map_or_else(
+                |e| {
                     warn!("Invalid user config {}: {e}", path.display());
                     Self::default()
-                }),
+                },
+                |c| c.renderer,
+            ),
             Err(_) => Self::default(),
         }
     }
@@ -156,6 +160,7 @@ pub mod crash_marker {
         config_dir().map(|d| d.join(CRASH_MARKER_FILE))
     }
 
+    #[must_use]
     pub fn exists() -> bool {
         path().is_some_and(|p| p.exists())
     }

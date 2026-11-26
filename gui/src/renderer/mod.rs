@@ -23,6 +23,7 @@ pub enum RendererChoice {
 }
 
 impl RendererChoice {
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         <Self as clap::ValueEnum>::from_str(s.trim(), true).ok()
     }
@@ -36,6 +37,7 @@ pub enum Backend {
 }
 
 impl Backend {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Glow => "glow",
@@ -54,11 +56,13 @@ impl From<Backend> for RendererChoice {
 }
 
 /// Whether this build contains the wgpu renderer
+#[must_use]
 pub const fn wgpu_compiled() -> bool {
     cfg!(feature = "wgpu")
 }
 
 /// Description of the hardware wgpu adapter, `None` if there is none (or only a software one)
+#[must_use]
 pub fn probe_wgpu() -> Option<String> {
     #[cfg(feature = "wgpu")]
     {
@@ -71,6 +75,7 @@ pub fn probe_wgpu() -> Option<String> {
 }
 
 /// Resolves the user's choice to a backend available in this build and on this machine.
+#[must_use]
 pub fn resolve(choice: RendererChoice) -> Backend {
     match choice {
         RendererChoice::Glow => Backend::Glow,
@@ -92,7 +97,7 @@ pub fn resolve(choice: RendererChoice) -> Backend {
 }
 
 /// Backend specific `NativeOptions` adjustments
-pub fn configure(options: &mut eframe::NativeOptions, backend: Backend) {
+pub const fn configure(options: &mut eframe::NativeOptions, backend: Backend) {
     match backend {
         Backend::Glow => glow::configure(options),
         #[cfg(feature = "wgpu")]
@@ -103,6 +108,7 @@ pub fn configure(options: &mut eframe::NativeOptions, backend: Backend) {
 }
 
 /// Human readable info about the active renderer, e.g. for the status bar
+#[must_use]
 pub fn active_info(frame: &eframe::Frame) -> String {
     #[cfg(feature = "wgpu")]
     if let Some(info) = wgpu::info(frame) {

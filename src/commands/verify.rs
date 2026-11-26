@@ -3,7 +3,10 @@ use std::process::ExitCode;
 
 use log::{error, info, warn};
 
-use crate::*;
+use crate::{
+    ESupportedGame, TParser, debug_get_mods_from_order_rules, get_default_rules_dir,
+    get_game_version, parser, sorter,
+};
 
 /// Verifies integrity of the specified rules
 pub fn verify(game: ESupportedGame, rules_path: &Option<String>) -> ExitCode {
@@ -18,7 +21,7 @@ pub fn verify(game: ESupportedGame, rules_path: &Option<String>) -> ExitCode {
     let game_version = get_game_version(game);
     let mut parser = parser::get_parser(game, game_version);
     if let Err(e) = parser.parse(rules_dir) {
-        error!("Parser init failed: {}", e);
+        error!("Parser init failed: {e}");
         return ExitCode::FAILURE;
     }
 
@@ -28,19 +31,14 @@ pub fn verify(game: ESupportedGame, rules_path: &Option<String>) -> ExitCode {
     }
 
     let mods = debug_get_mods_from_order_rules(&parser.order_rules);
-    match sorter::new_unstable_sorter().topo_sort(
-        game,
-        &mods,
-        &parser.order_rules,
-        &parser.warning_rules,
-    ) {
-        Ok(_) => {
-            info!("Verify SUCCESS");
-            ExitCode::SUCCESS
-        }
-        Err(_) => {
-            error!("Verify FAILURE");
-            ExitCode::FAILURE
-        }
+    if sorter::new_unstable_sorter()
+        .topo_sort(game, &mods, &parser.order_rules, &parser.warning_rules)
+        .is_ok()
+    {
+        info!("Verify SUCCESS");
+        ExitCode::SUCCESS
+    } else {
+        error!("Verify FAILURE");
+        ExitCode::FAILURE
     }
 }

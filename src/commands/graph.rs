@@ -4,7 +4,10 @@ use std::{env, path::PathBuf};
 use log::{error, info};
 use petgraph::dot::{Config, Dot};
 
-use crate::*;
+use crate::{
+    ESupportedGame, GRAPH_FILE, PluginData, TParser, gather_cp77_mods, gather_openmw_mods,
+    gather_tes3_mods, get_default_rules_dir, get_game_version, parser, read_file_as_list, sorter,
+};
 
 pub fn graph(
     game: ESupportedGame,
@@ -45,7 +48,7 @@ pub fn graph(
 
     let mut parser = parser::get_parser(game, game_version);
     if let Err(e) = parser.parse(rules_dir) {
-        error!("Parser init failed: {}", e);
+        error!("Parser init failed: {e}");
         return ExitCode::FAILURE;
     }
 
@@ -56,8 +59,7 @@ pub fn graph(
         let viz = Dot::with_config(&g, &[Config::EdgeNoLabel]);
         // write to file
         let mut file = std::fs::File::create(GRAPH_FILE).expect("file create failed");
-        std::io::Write::write_all(&mut file, format!("{:?}", viz).as_bytes())
-            .expect("write failed");
+        std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes()).expect("write failed");
     }
 
     ExitCode::SUCCESS

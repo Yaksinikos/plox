@@ -23,8 +23,7 @@ mod scc_tests {
 
         let file_path = dir.join("graphviz.dot");
         let mut file = std::fs::File::create(file_path).expect("file create failed");
-        std::io::Write::write_all(&mut file, format!("{:?}", viz).as_bytes())
-            .expect("write failed");
+        std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes()).expect("write failed");
     }
 
     fn clean_mods(
@@ -37,7 +36,7 @@ mod scc_tests {
 
         let mut mods_to_remove = vec![];
         let mut warning_rules = warning_rules.to_vec();
-        for rule in warning_rules.iter_mut() {
+        for rule in &mut warning_rules {
             // only conflict rules
             if let EWarningRule::Conflict(conflict) = rule
                 && conflict.eval(plugins)
@@ -66,8 +65,8 @@ mod scc_tests {
 
         // log
         warn!("removing mods: {:?}", mods_to_remove.len());
-        for mod_name in mods_to_remove.iter() {
-            warn!("\t{}", mod_name);
+        for mod_name in &mods_to_remove {
+            warn!("\t{mod_name}");
         }
 
         // debug print to file

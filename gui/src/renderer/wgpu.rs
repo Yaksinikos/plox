@@ -20,7 +20,7 @@ pub fn probe() -> Option<String> {
         .map(|info| format!("{} ({:?})", info.name, info.backend))
 }
 
-pub fn configure(options: &mut eframe::NativeOptions) {
+pub const fn configure(options: &mut eframe::NativeOptions) {
     options.renderer = eframe::Renderer::Wgpu;
     options.multisampling = 0;
     options.depth_buffer = 0;

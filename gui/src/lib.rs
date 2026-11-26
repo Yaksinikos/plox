@@ -1,5 +1,3 @@
-#![warn(clippy::all, rust_2018_idioms)]
-
 pub mod launcher;
 pub mod renderer;
 pub mod settings;

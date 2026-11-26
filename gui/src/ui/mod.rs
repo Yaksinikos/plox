@@ -127,6 +127,7 @@ const SMOKE_TEST_FRAMES: u32 = 3;
 
 impl PloxApp {
     /// Called once before the first frame.
+    #[must_use]
     pub fn new(cc: &eframe::CreationContext<'_>, options: AppOptions) -> Self {
         cc.egui_ctx.set_zoom_factor(1.3);
 

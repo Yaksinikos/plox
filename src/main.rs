@@ -5,7 +5,10 @@ use clap::{Parser, Subcommand};
 use env_logger::Env;
 use log::{error, info};
 
-use plox::*;
+use plox::{
+    CliSortOptions, ELogLevel, ESupportedGame, detect_game, graph, list_mods, log_level_to_str,
+    sort, verify,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -86,7 +89,7 @@ fn main() -> ExitCode {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("{e}");
 
             println!("\nPress any button to continue");
             let mut buffer = String::new();
@@ -110,10 +113,10 @@ fn main() -> ExitCode {
 
     // detect game
     let game = if let Some(game) = cli.game {
-        info!("Set game to: {:?}", game);
+        info!("Set game to: {game:?}");
         game
     } else if let Some(g) = detect_game() {
-        info!("Detected game: {:?}", g);
+        info!("Detected game: {g:?}");
         g
     } else {
         error!("No game specified or detected");

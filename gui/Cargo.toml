@@ -8,6 +8,9 @@ authors.workspace = true
 description.workspace = true
 documentation.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = ["wgpu"]
 # Modern renderer (Vulkan, DX12, Metal). The OpenGL (glow) renderer is always built in.

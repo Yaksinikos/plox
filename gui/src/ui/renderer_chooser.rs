@@ -19,7 +19,8 @@ pub struct ChooserState {
 }
 
 impl ChooserState {
-    pub fn new(preselect: Backend, crashed: bool, wgpu_adapter: Option<String>) -> Self {
+    #[must_use]
+    pub const fn new(preselect: Backend, crashed: bool, wgpu_adapter: Option<String>) -> Self {
         Self {
             selected: preselect,
             dont_ask_again: false,

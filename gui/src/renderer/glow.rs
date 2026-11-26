@@ -2,7 +2,7 @@
 
 use eframe::glow::HasContext as _;
 
-pub fn configure(options: &mut eframe::NativeOptions) {
+pub const fn configure(options: &mut eframe::NativeOptions) {
     options.renderer = eframe::Renderer::Glow;
     // Keep requirements minimal for legacy drivers.
     options.multisampling = 0;

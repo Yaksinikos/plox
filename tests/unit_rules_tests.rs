@@ -32,31 +32,31 @@ mod unit_tests {
 
         // test that [Note] evaluates as true when a mod is present
         {
-            let mut rule = Note::new("".into(), &[e(A)]);
+            let mut rule = Note::new(String::new(), &[e(A)]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [Note] evaluates as true when both mods is present
         {
-            let mut rule = Note::new("".into(), &[e(A), e(B)]);
+            let mut rule = Note::new(String::new(), &[e(A), e(B)]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [Note] evaluates as true when one of two mods is present
         {
-            let mut rule = Note::new("".into(), &[e(A), e(X)]);
+            let mut rule = Note::new(String::new(), &[e(A), e(X)]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [Note] evaluates as false when a mod is not present
         {
-            let mut rule = Note::new("".into(), &[e(X)]);
+            let mut rule = Note::new(String::new(), &[e(X)]);
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [Note] evaluates as false when a mod is not present
         {
-            let mut rule = Note::new("".into(), &[e(X), e(Y)]);
+            let mut rule = Note::new(String::new(), &[e(X), e(Y)]);
             assert!(!rule.eval(&get_mods()));
         }
     }
@@ -67,31 +67,31 @@ mod unit_tests {
 
         // test that [Conflict] evaluates as true when both mods are present
         {
-            let mut rule = Conflict::new("".into(), &[e(A), e(B)]);
+            let mut rule = Conflict::new(String::new(), &[e(A), e(B)]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that the order doesn't matter
         {
-            let mut rule = Conflict::new("".into(), &[e(B), e(A)]);
+            let mut rule = Conflict::new(String::new(), &[e(B), e(A)]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [Conflict] doesn't evaluate as true when one is missing
         {
-            let mut rule = Conflict::new("".into(), &[e(B), e(X)]);
+            let mut rule = Conflict::new(String::new(), &[e(B), e(X)]);
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that the order doesn't matter
         {
-            let mut rule = Conflict::new("".into(), &[e(X), e(B)]);
+            let mut rule = Conflict::new(String::new(), &[e(X), e(B)]);
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [Conflict] doesn't evaluate as true when both are missing
         {
-            let mut rule = Conflict::new("".into(), &[e(X), e(Y)]);
+            let mut rule = Conflict::new(String::new(), &[e(X), e(Y)]);
             assert!(!rule.eval(&get_mods()));
         }
     }
@@ -102,25 +102,25 @@ mod unit_tests {
 
         // test that [Requires] evaluates as true when A is true and B is not
         {
-            let mut rule = Requires::new("".into(), e(A), e(X));
+            let mut rule = Requires::new(String::new(), e(A), e(X));
             assert!(rule.eval(&get_mods()));
         }
 
         // test that the order does matter
         {
-            let mut rule = Requires::new("".into(), e(X), e(A));
+            let mut rule = Requires::new(String::new(), e(X), e(A));
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [Requires] evaluates as false when both mods are missing
         {
-            let mut rule = Requires::new("".into(), e(X), e(Y));
+            let mut rule = Requires::new(String::new(), e(X), e(Y));
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [Requires] evaluates as false when both mods are there
         {
-            let mut rule = Requires::new("".into(), e(A), e(B));
+            let mut rule = Requires::new(String::new(), e(A), e(B));
             assert!(!rule.eval(&get_mods()));
         }
     }
@@ -131,25 +131,25 @@ mod unit_tests {
 
         // test that [Patch] evaluates as true when A is true and B is not: mod is there, but patch is missing
         {
-            let mut rule = Patch::new("".into(), e(A), e(X));
+            let mut rule = Patch::new(String::new(), e(A), e(X));
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [Patch] evaluates as true when B is true and A is not: patch is there, but mod is missing
         {
-            let mut rule = Patch::new("".into(), e(X), e(A));
+            let mut rule = Patch::new(String::new(), e(X), e(A));
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [Patch] evaluates as false when both mods are missing
         {
-            let mut rule = Patch::new("".into(), e(X), e(Y));
+            let mut rule = Patch::new(String::new(), e(X), e(Y));
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [Patch] evaluates as false when both mods are there
         {
-            let mut rule = Patch::new("".into(), e(A), e(B));
+            let mut rule = Patch::new(String::new(), e(A), e(B));
             assert!(!rule.eval(&get_mods()));
         }
     }
@@ -182,7 +182,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
 
@@ -208,7 +208,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
 
@@ -234,7 +234,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
     }
@@ -249,7 +249,7 @@ mod unit_tests {
             ];
             let mods_data = mods
                 .iter()
-                .map(|e| PluginData::new(e.to_string(), 0))
+                .map(|e| PluginData::new(e.clone(), 0))
                 .collect::<Vec<_>>();
 
             let order: Order = Order::new(vec!["b.esp".to_string(), "a.esp".to_string()]);
@@ -272,7 +272,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
     }
@@ -300,7 +300,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
 
@@ -325,7 +325,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
     }
@@ -354,7 +354,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
 
@@ -380,7 +380,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
 
@@ -406,7 +406,7 @@ mod unit_tests {
                         result
                     );
                 }
-                Err(e) => panic!("Error: {}", e),
+                Err(e) => panic!("Error: {e}"),
             }
         }
     }
@@ -418,37 +418,37 @@ mod unit_tests {
 
         // test that [ALL] is true if A and B is true
         {
-            let mut rule = Note::new("".into(), &[ALL::new(vec![e(A), e(B)]).into()]);
+            let mut rule = Note::new(String::new(), &[ALL::new(vec![e(A), e(B)]).into()]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [ALL] is false if A is true and B is not true
         {
-            let mut rule = Note::new("".into(), &[ALL::new(vec![e(A), e(X)]).into()]);
+            let mut rule = Note::new(String::new(), &[ALL::new(vec![e(A), e(X)]).into()]);
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [ALL] is false if A is not true and B is true
         {
-            let mut rule = Note::new("".into(), &[ALL::new(vec![e(X), e(A)]).into()]);
+            let mut rule = Note::new(String::new(), &[ALL::new(vec![e(X), e(A)]).into()]);
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [ALL] is false if A is not true and B is not true
         {
-            let mut rule = Note::new("".into(), &[ALL::new(vec![e(X), e(Y)]).into()]);
+            let mut rule = Note::new(String::new(), &[ALL::new(vec![e(X), e(Y)]).into()]);
             assert!(!rule.eval(&get_mods()));
         }
 
         // test that [ANY] is true if A or B is true
         {
-            let mut rule = Note::new("".into(), &[ANY::new(vec![e(A), e(X)]).into()]);
+            let mut rule = Note::new(String::new(), &[ANY::new(vec![e(A), e(X)]).into()]);
             assert!(rule.eval(&get_mods()));
         }
 
         // test that [ANY] is true if A and B are not true
         {
-            let mut rule = Note::new("".into(), &[ANY::new(vec![e(Y), e(X)]).into()]);
+            let mut rule = Note::new(String::new(), &[ANY::new(vec![e(Y), e(X)]).into()]);
             assert!(!rule.eval(&get_mods()));
         }
     }

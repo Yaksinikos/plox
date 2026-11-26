@@ -328,7 +328,7 @@ mod unit_tests {
         let mods = ["Texture Fix 2.0.esm"]
             .iter()
             .map(|e| PluginData {
-                name: e.to_lowercase().to_string(),
+                name: e.to_lowercase(),
                 size: 0_u64,
                 description: None,
                 masters: None,
@@ -353,7 +353,7 @@ mod unit_tests {
                 EVerOperator::Less,
                 "2.0.0".to_string(),
             );
-            let mut rule = plox::rules::Conflict::new("".into(), &[expr1.into(), expr2.into()]);
+            let mut rule = plox::rules::Conflict::new(String::new(), &[expr1.into(), expr2.into()]);
             assert!(!rule.eval(&mods));
         }
     }

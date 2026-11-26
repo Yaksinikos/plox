@@ -5,10 +5,21 @@ use std::io::{BufRead, BufReader, Cursor, Error, Read, Result, Seek, SeekFrom};
 use std::path::Path;
 
 use byteorder::ReadBytesExt;
-use log::*;
+use log::{debug, info, warn};
 
-use crate::{ESupportedGame, PluginData, TParser, expressions::*, rules::*};
+use crate::{
+    ESupportedGame, PluginData, TParser,
+    expressions::{
+        ALL, ANY, Atomic, DESC, EGVerOperator, EVerOperator, Expression, GVER, NOT, SIZE,
+        TExpression, VER,
+    },
+    rules::{
+        Conflict, EOrderRule, ERule, EWarningRule, NearEnd, NearStart, Note, Order, Patch,
+        Requires, TWarningRule,
+    },
+};
 
+#[must_use]
 pub fn get_parser(game: ESupportedGame, game_version: Option<String>) -> Parser {
     match game {
         ESupportedGame::Morrowind => Parser::new(
@@ -35,10 +46,12 @@ pub fn get_parser(game: ESupportedGame, game_version: Option<String>) -> Parser 
     }
 }
 
+#[must_use]
 pub fn new_cyberpunk_parser() -> Parser {
     Parser::new(vec![".archive".into()], ESupportedGame::Cyberpunk, None)
 }
 
+#[must_use]
 pub fn new_tes3_parser() -> Parser {
     Parser::new(
         vec![".esp".into(), ".esm".into()],
@@ -47,6 +60,7 @@ pub fn new_tes3_parser() -> Parser {
     )
 }
 
+#[must_use]
 pub fn new_openmw_parser() -> Parser {
     Parser::new(
         vec![
@@ -68,7 +82,7 @@ struct ChunkWrapper {
 }
 
 impl ChunkWrapper {
-    fn new(data: Vec<u8>, info: String) -> Self {
+    const fn new(data: Vec<u8>, info: String) -> Self {
         Self { data, info }
     }
 }
@@ -79,18 +93,22 @@ pub struct Warning {
 }
 
 impl Warning {
+    #[must_use]
     pub fn get_comment(&self) -> String {
         self.rule.get_comment()
     }
 
+    #[must_use]
     pub fn get_ui_comment(&self) -> String {
         self.rule.get_ui_comment()
     }
 
+    #[must_use]
     pub fn get_plugins(&self) -> Vec<String> {
         self.rule.get_plugins()
     }
 
+    #[must_use]
     pub fn get_rule_name(&self) -> String {
         match self.rule {
             EWarningRule::Conflict(_) => "Conflict".to_owned(),
@@ -113,7 +131,8 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(ext: Vec<String>, game: ESupportedGame, game_version: Option<String>) -> Self {
+    #[must_use]
+    pub const fn new(ext: Vec<String>, game: ESupportedGame, game_version: Option<String>) -> Self {
         Self {
             ext,
             game,
@@ -312,14 +331,11 @@ impl Parser {
                 }
                 Err(err) => {
                     // log error and skip chunk
-                    debug!(
-                        "Error '{}' at chunk #{}, starting at line: {}",
-                        err, idx, info
-                    );
+                    debug!("Error '{err}' at chunk #{idx}, starting at line: {info}");
                     let string = String::from_utf8(chunk.data).expect("not valid utf8");
-                    debug!("{}", string);
+                    debug!("{string}");
                 }
-            };
+            }
         }
 
         Ok(rules)
@@ -389,7 +405,6 @@ impl Parser {
                             for (idx, line) in reader
                                 .lines()
                                 .map_while(Result::ok)
-                                .map(|f| f.to_owned())
                                 .filter(|p| !p.trim().is_empty())
                                 .enumerate()
                             {
@@ -417,7 +432,7 @@ impl Parser {
                                 }
 
                                 // this is a proper line
-                                body += format!("{}\n", line).as_str();
+                                body += format!("{line}\n").as_str();
                             }
 
                             // now parse rule body
@@ -438,6 +453,7 @@ impl Parser {
         }
     }
 
+    #[must_use]
     pub fn ends_with_vec(&self, current_buffer: &str) -> bool {
         let mut b = false;
         for ext in &self.ext {
@@ -452,7 +468,7 @@ impl Parser {
     fn ends_with_vec_whitespace(&self, current_buffer: &str) -> bool {
         let mut b = false;
         for ext in &self.ext {
-            if current_buffer.ends_with(format!("{} ", ext).as_str()) {
+            if current_buffer.ends_with(format!("{ext} ").as_str()) {
                 b = true;
                 break;
             }
@@ -463,8 +479,8 @@ impl Parser {
     fn ends_with_vec_whitespace_or_newline(&self, current_buffer: &str) -> bool {
         let mut b = false;
         for ext in &self.ext {
-            if current_buffer.ends_with(format!("{} ", ext).as_str())
-                || current_buffer.ends_with(format!("{}\n", ext).as_str())
+            if current_buffer.ends_with(format!("{ext} ").as_str())
+                || current_buffer.ends_with(format!("{ext}\n").as_str())
             {
                 b = true;
                 break;
@@ -475,21 +491,22 @@ impl Parser {
     }
 
     /// Splits a String into string tokens (either separated by extension or wrapped in quotation marks)
+    #[must_use]
     pub fn tokenize(&self, line: String) -> Vec<String> {
         let mut tokens: Vec<String> = vec![];
 
         // ignore everything after ;
-        let line = line.clone();
+        let line = line;
         if line.contains(';') {
             line.split(';')
                 .next()
                 .unwrap_or("")
                 .trim()
-                .clone_into(&mut line.to_owned());
+                .clone_into(&mut line.clone());
         }
 
         let mut is_quoted = false;
-        let mut current_token: String = "".to_owned();
+        let mut current_token: String = String::new();
         for c in line.chars() {
             // check quoted and read in chars
             if c == '"' {
@@ -509,14 +526,14 @@ impl Parser {
             // check if we found an end
             if self.ends_with_vec_whitespace(&current_token) {
                 // ignore whitespace in quoted segments
-                if !is_quoted {
+                if is_quoted {
+                    current_token += c.to_string().as_str();
+                } else {
                     // end token
                     if !current_token.is_empty() {
                         tokens.push(current_token.trim().to_owned());
                         current_token.clear();
                     }
-                } else {
-                    current_token += c.to_string().as_str();
                 }
             }
         }
@@ -609,7 +626,7 @@ impl Parser {
 
         // rest
         if !current_buffer.is_empty() {
-            chunks.push((current_buffer.to_owned(), is_expr));
+            chunks.push((current_buffer.clone(), is_expr));
             current_buffer.clear();
         }
 
@@ -621,11 +638,9 @@ impl Parser {
 
         let mut expressions: Vec<Expression> = vec![];
         for (chunk, is_expr) in chunks {
-            match self.parse_expression(chunk.as_str(), is_expr) {
-                Ok(it) => {
-                    expressions.push(it);
-                }
-                Err(err) => return Err(err),
+            {
+                let it = self.parse_expression(chunk.as_str(), is_expr)?;
+                expressions.push(it);
             }
         }
 
@@ -773,8 +788,8 @@ impl Parser {
 }
 
 fn starts_with_whitespace(current_buffer: &str, arg: &str) -> bool {
-    current_buffer.starts_with(format!("{} ", arg).as_str())
-        || current_buffer.starts_with(format!("{}\t", arg).as_str())
+    current_buffer.starts_with(format!("{arg} ").as_str())
+        || current_buffer.starts_with(format!("{arg}\t").as_str())
 }
 
 /// Parses the DESC predicate and returns its parts
@@ -910,7 +925,7 @@ where
     loop {
         let mut byte = [0; 1];
         match reader.read_exact(&mut byte) {
-            Ok(_) => {
+            Ok(()) => {
                 buffer.push(byte[0]);
 
                 if byte[0] == b'[' {
@@ -924,7 +939,7 @@ where
                 }
             }
             Err(err) => {
-                eprintln!("Error reading input: {}", err);
+                eprintln!("Error reading input: {err}");
                 return Err(err);
             }
         }
@@ -1012,7 +1027,7 @@ mod tests {
 
             for input in inputs {
                 let reader = Cursor::new(input.as_bytes());
-                assert!(parse_rule_expression(reader).is_err())
+                assert!(parse_rule_expression(reader).is_err());
             }
         }
 
@@ -1037,7 +1052,7 @@ mod tests {
                 .iter()
                 .map(|f| f.trim().trim_matches('"').trim())
                 .collect::<Vec<_>>();
-            assert_eq!(expected, parser.tokenize(input.to_owned()).as_slice());
+            assert_eq!(expected, parser.tokenize(input).as_slice());
         }
     }
 }
