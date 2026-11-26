@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+# cmd.exe misparses batch files with LF endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.ico binary
+*.esp binary
+*.esm binary
+*.archive binary
