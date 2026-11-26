@@ -16,7 +16,6 @@ pub mod rules;
 pub mod sorter;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use filetime::set_file_mtime;
 use ini::Ini;
 use log::{error, info, warn};
 use regex::Regex;
@@ -841,6 +840,14 @@ fn parse_hedr<R: Read + Seek>(reader: &mut R, stream_size: u64) -> std::io::Resu
     Ok(header)
 }
 
+fn set_file_mtime(path: &Path, unix_secs: u64) -> io::Result<()> {
+    let modified = std::time::UNIX_EPOCH + std::time::Duration::from_secs(unix_secs);
+    File::options()
+        .write(true)
+        .open(path)?
+        .set_times(fs::FileTimes::new().set_modified(modified))
+}
+
 fn redate_mods(files: &[PathBuf]) -> Result<(), io::Error> {
     let fixed_file_times: HashMap<String, usize> = HashMap::from([
         ("morrowind.esm".into(), 1024695106),
@@ -854,17 +861,12 @@ fn redate_mods(files: &[PathBuf]) -> Result<(), io::Error> {
         // check if is a fixed file time file
         let filename = mod_path.file_name().unwrap().to_str().unwrap();
         if let Some(time) = fixed_file_times.get(&filename.to_lowercase()) {
-            let time = *time as i64;
-            current_time = time;
-            set_file_mtime(mod_path, filetime::FileTime::from_unix_time(time, 0))?;
+            current_time = *time as u64;
         } else {
             // set the time to start time + 60
             current_time += 60;
-            set_file_mtime(
-                mod_path,
-                filetime::FileTime::from_unix_time(current_time, 0),
-            )?;
         }
+        set_file_mtime(mod_path, current_time)?;
     }
 
     Ok(())
@@ -1278,41 +1280,40 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_redate_mods() {
-    //     let result = [
-    //         "morrowind.esm".to_owned(),
-    //         "tribunal.esm".to_owned(),
-    //         "bloodmoon.esm".to_owned(),
-    //         "a.esp".to_owned(),
-    //         "b.esp".to_owned(),
-    //         "c.esp".to_owned(),
-    //     ];
+    #[test]
+    fn test_redate_mods() {
+        let dir = std::env::temp_dir().join(format!("plox_redate_{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let names = [
+            "morrowind.esm",
+            "tribunal.esm",
+            "bloodmoon.esm",
+            "a.esp",
+            "b.esp",
+        ];
+        let files: Vec<PathBuf> = names.iter().map(|n| dir.join(n)).collect();
+        for f in &files {
+            File::create(f).unwrap();
+        }
 
-    //     // create the files in /tmp
-    //     create_dir_all("tmp").expect("copuld not create dir");
-    //     let mut files = vec![];
-    //     for r in &result {
-    //         let mod_path = PathBuf::from("tmp").join(r);
-    //         let _ = File::create(&mod_path);
-    //         files.push(mod_path.clone());
-    //     }
+        redate_mods(&files).unwrap();
 
-    //     redate_mods(&files).expect("redate failed");
+        let secs = |p: &PathBuf| {
+            fs::metadata(p)
+                .unwrap()
+                .modified()
+                .unwrap()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        };
+        assert_eq!(secs(&files[0]), 1_024_695_106);
+        assert_eq!(secs(&files[2]), 1_051_807_050);
+        assert_eq!(secs(&files[3]), 1_051_807_110);
+        assert_eq!(secs(&files[4]), 1_051_807_170);
 
-    //     // check if the filetime is correct
-    //     for path in &files {
-    //         let metadata = fs::metadata(path).expect("metadata failed");
-    //         let modified = metadata.modified().expect("modified failed");
-    //         let unix_time = filetime::FileTime::from_system_time(modified);
-    //         eprintln!("{} - {:?}", path.display(), unix_time);
-    //     }
-
-    //     // delete the files again
-    //     for path in &files {
-    //         fs::remove_file(path).expect("remove failed");
-    //     }
-    // }
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn test_match_filename_version() {

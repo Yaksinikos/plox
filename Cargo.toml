@@ -1,6 +1,6 @@
 [workspace]
 members = ["gui"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 version = "0.5.0"
@@ -27,14 +27,12 @@ documentation.workspace = true
 
 [dependencies]
 openmw-cfg = "0.6"                                              # move to feature flag
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 petgraph = "0.8"
 rust-ini = "0.21"
-regex = "1.11"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
-serde_json = "1.0"
+regex = "1.13"
+reqwest = { version = "0.13", features = ["blocking"] }
 seahash = "4.1"
-filetime = "0.2"
 semver = "1.0"
 lenient_semver = "0.4"
 pelite = "0.10"
@@ -46,7 +44,8 @@ serde = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4"
-rand = "0.9"
+serde_json = "1.0"
+rand = "0.10"
 
 
 [profile.release]
