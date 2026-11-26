@@ -63,6 +63,13 @@ pub const fn wgpu_compiled() -> bool {
 
 /// Description of the hardware wgpu adapter, `None` if there is none (or only a software one)
 #[must_use]
+#[cfg_attr(
+    not(feature = "wgpu"),
+    expect(
+        clippy::missing_const_for_fn,
+        reason = "only const without the wgpu feature"
+    )
+)]
 pub fn probe_wgpu() -> Option<String> {
     #[cfg(feature = "wgpu")]
     {
@@ -84,15 +91,16 @@ pub fn resolve(choice: RendererChoice) -> Backend {
             log::warn!("This build has no wgpu renderer, using OpenGL");
             Backend::Glow
         }
-        RendererChoice::Auto => {
-            if let Some(adapter) = probe_wgpu() {
-                log::info!("Hardware wgpu adapter found: {adapter}");
-                Backend::Wgpu
-            } else {
+        RendererChoice::Auto => probe_wgpu().map_or_else(
+            || {
                 log::info!("No hardware wgpu adapter found, using OpenGL");
                 Backend::Glow
-            }
-        }
+            },
+            |adapter| {
+                log::info!("Hardware wgpu adapter found: {adapter}");
+                Backend::Wgpu
+            },
+        ),
     }
 }
 

@@ -325,17 +325,14 @@ mod unit_tests {
         // Texture Fix 2.0.esm
         // [VER < 2.0 Texture Fix <VER>.esm]
 
-        let mods = ["Texture Fix 2.0.esm"]
-            .iter()
-            .map(|e| PluginData {
-                name: e.to_lowercase(),
-                size: 0_u64,
-                description: None,
-                masters: None,
-                version: None,
-                game_version: None,
-            })
-            .collect::<Vec<_>>();
+        let mods = vec![PluginData {
+            name: "Texture Fix 2.0.esm".to_lowercase(),
+            size: 0_u64,
+            description: None,
+            masters: None,
+            version: None,
+            game_version: None,
+        }];
 
         // {
         //     let expr = VER::new(

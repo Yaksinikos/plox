@@ -100,10 +100,7 @@ fn main() -> ExitCode {
     };
 
     // logger
-    let mut level = ELogLevel::Info;
-    if let Some(lvl) = cli.log_level {
-        level = lvl;
-    }
+    let level = cli.log_level.unwrap_or(ELogLevel::Info);
     let env = Env::default()
         .default_filter_or(log_level_to_str(level))
         .default_write_style_or("always");
@@ -143,7 +140,7 @@ fn main() -> ExitCode {
             dry_run,
             unstable,
             no_download,
-        } => sort(CliSortOptions {
+        } => sort(&CliSortOptions {
             game,
             game_folder: root.clone(),
             rules_dir: rules_dir.clone(),

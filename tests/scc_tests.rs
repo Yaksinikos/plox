@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod scc_tests {
 
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use log::warn;
     use petgraph::stable_graph::StableGraph;
@@ -86,9 +86,9 @@ mod scc_tests {
         mods_cpy
     }
 
-    fn scc(parser: Parser, tmp_dir: PathBuf) -> bool {
+    fn scc(parser: &Parser, tmp_dir: &Path) -> bool {
         let mut mods = debug_get_mods_from_order_rules(&parser.order_rules);
-        mods = clean_mods(&mods, &parser.warning_rules, &tmp_dir);
+        mods = clean_mods(&mods, &parser.warning_rules, tmp_dir);
 
         let mut rng = rng();
         mods.shuffle(&mut rng);
@@ -96,7 +96,7 @@ mod scc_tests {
         let data = sorter::get_graph_data(&mods, &parser.order_rules, &parser.warning_rules);
         let g = sorter::build_graph(&data);
 
-        graphviz(&g, &tmp_dir);
+        graphviz(&g, tmp_dir);
 
         // cycle check
         let s = petgraph::algo::toposort(&g, None);
@@ -186,7 +186,7 @@ mod scc_tests {
         let mut parser = new_tes3_parser();
         parser.init_from_file("./tests/mlox/mlox_user.txt")?;
 
-        assert!(scc(parser, tmp_dir));
+        assert!(scc(&parser, &tmp_dir));
 
         Ok(())
     }
@@ -202,7 +202,7 @@ mod scc_tests {
         let mut parser = new_tes3_parser();
         parser.init_from_file("./tests/mlox/mlox_base.txt")?;
 
-        assert!(scc(parser, tmp_dir));
+        assert!(scc(&parser, &tmp_dir));
 
         Ok(())
     }
@@ -219,7 +219,7 @@ mod scc_tests {
         let mut parser = new_tes3_parser();
         parser.parse("./tests/mlox")?;
 
-        assert!(scc(parser, tmp_dir));
+        assert!(scc(&parser, &tmp_dir));
 
         Ok(())
     }

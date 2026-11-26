@@ -1,20 +1,12 @@
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use log::{error, info, warn};
 
-use crate::{
-    ESupportedGame, debug_get_mods_from_order_rules, get_default_rules_dir, get_game_version,
-    parser, sorter,
-};
+use crate::{ESupportedGame, debug_get_mods_from_order_rules, get_game_version, parser, sorter};
 
 /// Verifies integrity of the specified rules
 pub fn verify(game: ESupportedGame, rules_path: &Option<String>) -> ExitCode {
-    let rules_dir = if let Some(path) = rules_path {
-        PathBuf::from(path)
-    } else {
-        get_default_rules_dir(game)
-    };
+    let rules_dir = super::rules_dir(game, rules_path.as_deref());
 
     info!("Verifying rules from {} ...", rules_dir.display());
 

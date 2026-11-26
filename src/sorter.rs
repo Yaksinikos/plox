@@ -47,10 +47,6 @@ impl Sorter {
 
     /// Sorts the input mods topologically. Mods input is case sensitive!
     ///
-    /// # Panics
-    ///
-    /// Panics if .
-    ///
     /// # Errors
     ///
     /// This function will return an error if any parsing fails
@@ -79,70 +75,22 @@ impl Sorter {
 
         // cycle check
         if self.sort_type == ESortType::Unstable {
-            let sort;
-            let s = petgraph::algo::toposort(&g, None);
-
-            if let Ok(result) = s {
-                sort = result;
-            } else {
-                return Err("Graph contains a cycle");
-            }
-
+            let sort = petgraph::algo::toposort(&g, None).map_err(|_| "Graph contains a cycle")?;
             // map sorted index back to mods
-            let mut result = vec![];
-            for idx in sort {
-                let plugin = &plugins[idx.index()];
-                result.push(plugin.name.clone());
-            }
-            return Ok(result);
+            return Ok(sort
+                .into_iter()
+                .map(|idx| plugins[idx.index()].name.clone())
+                .collect());
         }
 
-        // sort
         let mut mods = plugins
             .iter()
             .map(|f| f.name.to_lowercase())
             .collect::<Vec<String>>();
-
-        // nearstart rules
-        for nearstart in order_rules
-            .iter()
-            .filter_map(nearstart2)
-            .flat_map(|f| f.names)
-            .rev()
-        {
-            if let Some(results) = wild_contains(&mods, &nearstart) {
-                // push to start of mods
-                for r in results {
-                    if let Some(index) = mods.iter().position(|f| f == &r) {
-                        let element = mods.remove(index);
-                        mods.insert(0, element);
-                    }
-                }
-            }
-        }
-
-        // nearend rules
-        for nearend in order_rules
-            .iter()
-            .filter_map(nearend2)
-            .flat_map(|f| f.names)
-            .rev()
-        {
-            if let Some(results) = wild_contains(&mods, &nearend) {
-                // push to end of mods
-                for r in results {
-                    if let Some(index) = mods.iter().position(|f| f == &r) {
-                        let element = mods.remove(index);
-                        mods.push(element);
-                    }
-                }
-            }
-        }
+        apply_near_rules(&mut mods, order_rules);
 
         let n = plugins.len();
-
         let mut index = 0;
-
         edges.sort_by_key(|k| k.0);
 
         for i in 1..self.max_iterations {
@@ -155,51 +103,15 @@ impl Sorter {
                 &mut index,
             );
 
-            // sort again
             if !any_change {
-                // sort esms now?
                 if game == ESupportedGame::Morrowind || game == ESupportedGame::Openmw {
-                    // put all items in mods_copy ending with .esm at the start
-                    let mut esms = vec![];
-                    for (i, m) in mods.iter().enumerate() {
-                        if m.ends_with(".esm") || m.ends_with(".omwgame") {
-                            esms.push(i);
-                        }
-                    }
-                    // now sort the mods_copy list
-                    for (last_i, i) in esms.iter().enumerate() {
-                        let element = mods.remove(*i);
-                        mods.insert(last_i, element);
-                    }
-
-                    // put standard tes3 esms at the start
-                    // if mods_copy.contains(&"bloodmoon.esm".into()) {
-                    //     let index = mods_copy.iter().position(|f| f == "bloodmoon.esm").unwrap();
-                    //     let element = mods_copy.remove(index);
-                    //     mods_copy.insert(0, element);
-                    // }
-
-                    // if mods_copy.contains(&"tribunal.esm".into()) {
-                    //     let index = mods_copy.iter().position(|f| f == "tribunal.esm").unwrap();
-                    //     let element = mods_copy.remove(index);
-                    //     mods_copy.insert(0, element);
-                    // }
-
-                    if let Some(index) = mods.iter().position(|f| f == "morrowind.esm") {
-                        let element = mods.remove(index);
-                        mods.insert(0, element);
-                    }
+                    move_masters_first(&mut mods);
                 }
-
-                // Return the sorted vector
                 // map sorted index back to mods
-                let mut result = vec![];
-                for lower_case_name in mods {
-                    let idx = index_dict[&lower_case_name];
-                    let plugin = &plugins[idx];
-                    result.push(plugin.name.clone());
-                }
-                return Ok(result);
+                return Ok(mods
+                    .iter()
+                    .map(|name| plugins[index_dict[name]].name.clone())
+                    .collect());
             }
 
             if let Some(edge) = edges.get(index) {
@@ -210,7 +122,6 @@ impl Sorter {
                 log::debug!("{i}, index {index}");
             }
         }
-
         // TODO find cycle
         {
             let viz = petgraph::dot::Dot::with_config(&g, &[petgraph::dot::Config::EdgeNoLabel]);
@@ -277,37 +188,28 @@ impl Sorter {
         last_index: &mut usize,
     ) -> bool {
         // optimize B: only check edges
-        let mut b = false;
-        for (idx, edge) in edges.iter().enumerate() {
-            let i = edge.0;
-            let j = edge.1;
+        let mut changed = false;
+        for (edge_idx, (from, to)) in edges.iter().enumerate() {
+            let before = &index_dict_rev[from];
+            let after = &index_dict_rev[to];
 
-            let x = &index_dict_rev[&i];
-            let y = &index_dict_rev[&j];
-
-            let (Some(idx_of_x), Some(idx_of_y)) = (
-                result.iter().position(|f| f == x),
-                result.iter().position(|f| f == y),
+            let (Some(pos_before), Some(pos_after)) = (
+                result.iter().position(|f| f == before),
+                result.iter().position(|f| f == after),
             ) else {
                 continue;
             };
 
-            // if i not before j x should be before y
-            if idx_of_x > idx_of_y {
-                let t = result[idx_of_x].clone();
-                result.remove(idx_of_x);
-                result.insert(idx_of_y, t);
-
-                *last_index = idx;
-
-                b = true;
-
-                // logging
-                //log::debug!("\t{}: {} -> {}: {}", idx_of_x, x, idx_of_y, y);
+            // `before` must come before `after`
+            if pos_before > pos_after {
+                let element = result.remove(pos_before);
+                result.insert(pos_after, element);
+                *last_index = edge_idx;
+                changed = true;
             }
         }
 
-        b
+        changed
     }
 }
 
@@ -320,15 +222,12 @@ pub fn get_graph_data(
     // build hashmaps for lookup
     let mut index_dict: HashMap<String, usize> = HashMap::new();
     let mut index_dict_rev: HashMap<usize, String> = HashMap::default();
-    let mut plugin_map: HashMap<usize, PluginData> = HashMap::default();
 
     for (i, plugin_data) in plugins.iter().enumerate() {
         let lower_case = plugin_data.name.to_lowercase();
 
         index_dict.insert(lower_case.clone(), i);
         index_dict_rev.insert(i, lower_case);
-
-        plugin_map.insert(i, plugin_data.to_owned());
     }
 
     // add edges from order rules
@@ -409,4 +308,50 @@ pub fn build_graph(data: &GraphData) -> StableGraph<String, ()> {
     }
 
     g
+}
+
+/// Moves plugins matching `NearStart` rules to the start and `NearEnd` rules to the end
+fn apply_near_rules(mods: &mut Vec<String>, order_rules: &[EOrderRule]) {
+    for nearstart in order_rules
+        .iter()
+        .filter_map(nearstart2)
+        .flat_map(|f| f.names)
+        .rev()
+    {
+        for r in wild_contains(mods, &nearstart).unwrap_or_default() {
+            if let Some(index) = mods.iter().position(|f| f == &r) {
+                let element = mods.remove(index);
+                mods.insert(0, element);
+            }
+        }
+    }
+
+    for nearend in order_rules
+        .iter()
+        .filter_map(nearend2)
+        .flat_map(|f| f.names)
+        .rev()
+    {
+        for r in wild_contains(mods, &nearend).unwrap_or_default() {
+            if let Some(index) = mods.iter().position(|f| f == &r) {
+                let element = mods.remove(index);
+                mods.push(element);
+            }
+        }
+    }
+}
+
+/// Puts master files (`.esm`, `.omwgame`) first, keeping their order, with `Morrowind.esm` at the very start
+fn move_masters_first(mods: &mut Vec<String>) {
+    let is_master = |m: &String| {
+        let ext = std::path::Path::new(m).extension();
+        ext.is_some_and(|e| e.eq_ignore_ascii_case("esm") || e.eq_ignore_ascii_case("omwgame"))
+    };
+    let (mut masters, rest): (Vec<String>, Vec<String>) = mods.drain(..).partition(is_master);
+    if let Some(index) = masters.iter().position(|f| f == "morrowind.esm") {
+        let element = masters.remove(index);
+        masters.insert(0, element);
+    }
+    mods.extend(masters);
+    mods.extend(rest);
 }

@@ -102,6 +102,11 @@ impl TWarningRule for EWarningRule {
 }
 
 pub trait TParser<T> {
+    /// Parses the body of a rule from `reader` into `rule`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the rule body is invalid.
     fn parse<R: Read + BufRead + Seek>(
         rule: &mut T,
         reader: R,
@@ -280,7 +285,7 @@ impl TParser<Self> for Order {
         {
             // HANDLE RULE PARSE
             // each line gets tokenized
-            for token in parser.tokenize(line) {
+            for token in parser.tokenize(&line) {
                 if !token.ends_with(']') && !parser.ends_with_vec(&token) {
                     return Err(Error::other("Parsing error: tokenize failed"));
                 }
@@ -330,7 +335,7 @@ impl TParser<Self> for NearStart {
         {
             // HANDLE RULE PARSE
             // each line gets tokenized
-            for token in parser.tokenize(line) {
+            for token in parser.tokenize(&line) {
                 if !token.ends_with(']') && !parser.ends_with_vec(&token) {
                     return Err(Error::other("Parsing error: tokenize failed"));
                 }
@@ -373,7 +378,7 @@ impl TParser<Self> for NearEnd {
         {
             // HANDLE RULE PARSE
             // each line gets tokenized
-            for token in parser.tokenize(line) {
+            for token in parser.tokenize(&line) {
                 if !token.ends_with(']') && !parser.ends_with_vec(&token) {
                     return Err(Error::other("Parsing error: tokenize failed"));
                 }
@@ -595,16 +600,13 @@ impl TWarningRule for Requires {
         self.comment.clone()
     }
     fn get_ui_comment(&self) -> String {
-        let mut comment = self.comment.clone();
-
         // automatically set the comment to the two expressions
-        if let Some(expr_a) = &self.expression_a
-            && let Some(expr_b) = &self.expression_b
-        {
-            comment = format!("'{}' requires '{}' ({})", expr_a, expr_b, self.comment);
+        match (&self.expression_a, &self.expression_b) {
+            (Some(expr_a), Some(expr_b)) => {
+                format!("'{}' requires '{}' ({})", expr_a, expr_b, self.comment)
+            }
+            _ => self.comment.clone(),
         }
-
-        comment
     }
     fn get_plugins(&self) -> Vec<String> {
         self.plugins.clone()

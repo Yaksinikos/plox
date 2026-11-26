@@ -433,14 +433,11 @@ mod unit_tests {
         ];
 
         for (a, b) in inputs {
-            test_all(
-                format!("[ALL {a} {b}]").to_lowercase().as_str(),
-                [a, b].to_vec(),
-            );
+            test_all(format!("[ALL {a} {b}]").to_lowercase().as_str(), &[a, b]);
         }
     }
 
-    fn test_all(input: &str, expected: Vec<&str>) {
+    fn test_all(input: &str, expected: &[&str]) {
         let parser = parser::new_cyberpunk_parser();
         assert_eq!(
             1,
@@ -475,10 +472,7 @@ mod unit_tests {
         ];
 
         for (a, b) in inputs {
-            test_desc(
-                format!("[DESC {a} {b}]").to_lowercase().as_str(),
-                [a, b].to_vec(),
-            );
+            test_desc(format!("[DESC {a} {b}]").to_lowercase().as_str(), &[a, b]);
         }
 
         let inputs = [
@@ -489,14 +483,11 @@ mod unit_tests {
         ];
 
         for (a, b) in inputs {
-            test_desc_neg(
-                format!("[DESC {a} {b}]").to_lowercase().as_str(),
-                [a, b].to_vec(),
-            );
+            test_desc_neg(format!("[DESC {a} {b}]").to_lowercase().as_str(), &[a, b]);
         }
     }
 
-    fn test_desc(input: &str, expected: Vec<&str>) {
+    fn test_desc(input: &str, expected: &[&str]) {
         let parser = parser::new_cyberpunk_parser();
 
         assert_eq!(
@@ -520,7 +511,7 @@ mod unit_tests {
         }
     }
 
-    fn test_desc_neg(input: &str, expected: Vec<&str>) {
+    fn test_desc_neg(input: &str, expected: &[&str]) {
         let parser = parser::new_cyberpunk_parser();
 
         assert_eq!(
@@ -552,23 +543,17 @@ mod unit_tests {
         let inputs = [("30881", "a.archive"), ("30881", "a some name.archive")];
 
         for (a, b) in inputs {
-            test_size(
-                format!("[SIZE {a} {b}]").to_lowercase().as_str(),
-                [a, b].to_vec(),
-            );
+            test_size(format!("[SIZE {a} {b}]").to_lowercase().as_str(), &[a, b]);
         }
 
         let inputs = [("!30881", "a.archive"), ("!30881", "a some name.archive")];
 
         for (a, b) in inputs {
-            test_size_neg(
-                format!("[SIZE {a} {b}]").to_lowercase().as_str(),
-                [a, b].to_vec(),
-            );
+            test_size_neg(format!("[SIZE {a} {b}]").to_lowercase().as_str(), &[a, b]);
         }
     }
 
-    fn test_size(input: &str, expected: Vec<&str>) {
+    fn test_size(input: &str, expected: &[&str]) {
         let parser = parser::new_cyberpunk_parser();
 
         assert_eq!(
@@ -591,7 +576,7 @@ mod unit_tests {
         }
     }
 
-    fn test_size_neg(input: &str, expected: Vec<&str>) {
+    fn test_size_neg(input: &str, expected: &[&str]) {
         let parser = parser::new_cyberpunk_parser();
 
         assert_eq!(
@@ -631,12 +616,12 @@ mod unit_tests {
         for (a, b, c) in inputs {
             test_ver(
                 format!("[VER {a} {b} {c}]").to_lowercase().as_str(),
-                [a, format!("{b}.0").as_str(), c].to_vec(),
+                &[a, format!("{b}.0").as_str(), c],
             );
         }
     }
 
-    fn test_ver(input: &str, expected: Vec<&str>) {
+    fn test_ver(input: &str, expected: &[&str]) {
         let parser = parser::new_cyberpunk_parser();
 
         assert_eq!(
@@ -653,7 +638,7 @@ mod unit_tests {
 
         if let Expression::VER(e) = expr {
             assert_eq!(format!("{}", e.operator), expected[0]);
-            assert_eq!(e.version.to_string(), expected[1]);
+            assert_eq!(e.version, expected[1]);
             assert!(is_atomic(&e.expression.into(), expected[2]));
         } else {
             panic!("wrong type");

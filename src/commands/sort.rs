@@ -5,8 +5,7 @@ use log::{debug, error, info, warn};
 
 use crate::{
     ESupportedGame, EWarningRule, PluginData, TWarningRule, download_latest_rules,
-    gather_cp77_mods, gather_openmw_mods, gather_tes3_mods, get_default_rules_dir,
-    get_game_version, parser, read_file_as_list, sorter, update_new_load_order,
+    get_game_version, parser, sorter, update_new_load_order,
 };
 
 pub struct CliSortOptions {
@@ -20,50 +19,24 @@ pub struct CliSortOptions {
 }
 
 /// Sorts the current mod load order according to specified rules
-pub fn sort(options: CliSortOptions) -> ExitCode {
+pub fn sort(options: &CliSortOptions) -> ExitCode {
     let game = options.game;
-    let root = options.game_folder;
-    let rules_path = options.rules_dir;
-    let mod_list = options.mod_list;
-    let dry_run = options.dry_run;
-    let unstable = options.unstable;
-    let no_download = options.no_download;
 
-    // get game root
-    let Some(root) = super::game_root(root.as_deref()) else {
+    let Some(root) = super::game_root(options.game_folder.as_deref()) else {
         return ExitCode::FAILURE;
     };
+    let rules_dir = super::rules_dir(game, options.rules_dir.as_deref());
 
-    // get default rules dir
-    let rules_dir = if let Some(path) = rules_path {
-        PathBuf::from(path)
-    } else {
-        get_default_rules_dir(game)
-    };
-
-    if no_download {
+    if options.no_download {
         info!("Skipping downloading latest rules");
     } else {
         download_latest_rules(game, &rules_dir);
     }
 
     let game_version = get_game_version(game);
-
-    // gather mods (optionally from a list)
-    let mods: Vec<PluginData>;
-    if let Some(modlist_path) = mod_list {
-        mods = read_file_as_list(modlist_path, &game_version);
-    } else {
-        mods = match game {
-            ESupportedGame::Morrowind => gather_tes3_mods(&root),
-            ESupportedGame::Cyberpunk => gather_cp77_mods(&root, &game_version),
-            ESupportedGame::Openmw => gather_openmw_mods(),
-        };
-        if mods.is_empty() {
-            info!("No mods found");
-            return ExitCode::FAILURE;
-        }
-    }
+    let Some(mods) = super::gather(game, &root, options.mod_list.as_deref(), &game_version) else {
+        return ExitCode::FAILURE;
+    };
 
     let mut parser = parser::get_parser(game, game_version);
     if let Err(e) = parser.parse(rules_dir) {
@@ -71,111 +44,99 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    // Print Warnings and Notes
     if parser.warning_rules.is_empty() {
         warn!("No rules found to evaluate");
     } else {
         info!("Evaluating mod list...\n");
         debug!("{mods:?}");
-
         parser.evaluate_plugins(&mods);
-        for warning in parser.warnings {
-            let rule = warning.rule;
-            match rule {
-                EWarningRule::Note(n) => {
-                    info!("[NOTE]\n{}", n.get_comment());
-                    info!("Reference: [{}]", n.plugins.join(";"));
-                }
-                EWarningRule::Conflict(c) => {
-                    warn!("[CONFLICT]\n{}", c.get_comment());
-                    info!("Reference: [{}]", c.plugins.join(";"));
-                }
-                EWarningRule::Requires(r) => {
-                    error!("[REQUIRES]\n{}", r.get_comment());
-                    info!("Reference: [{}]", r.plugins.join(";"));
-                }
-                EWarningRule::Patch(p) => {
-                    warn!("[Patch]\n{}", p.get_comment());
-                    info!("Reference: [{}]", p.plugins.join(";"));
-                }
-            }
-            println!();
+        for warning in &parser.warnings {
+            print_warning(&warning.rule);
         }
     }
 
-    // Sort
     if parser.order_rules.is_empty() {
         warn!("No rules found to sort");
-        ExitCode::SUCCESS
+        return ExitCode::SUCCESS;
+    }
+
+    info!("Sorting mods...");
+    let mut sorter = if options.unstable {
+        sorter::new_unstable_sorter()
     } else {
-        info!("Sorting mods...");
-        let mut sorter = if unstable {
-            sorter::new_unstable_sorter()
-        } else {
-            sorter::new_stable_sorter()
-        };
+        sorter::new_stable_sorter()
+    };
 
-        // check order first
-        // match check_order(&mods, &parser.order_rules) {
-        //     true => {
-        //         // exit
-        //         info!("Mods are in correct order, no sorting needed.");
-        //         return ExitCode::SUCCESS;
-        //     }
-        //     false => {}
-        // }
+    match sorter.topo_sort(game, &mods, &parser.order_rules, &parser.warning_rules) {
+        Ok(result) => apply_result(game, &mods, &result, options.dry_run),
+        Err(e) => {
+            error!("error sorting: {e:?}");
+            ExitCode::FAILURE
+        }
+    }
+}
 
-        match sorter.topo_sort(game, &mods, &parser.order_rules, &parser.warning_rules) {
-            Ok(result) => {
-                if dry_run {
-                    info!("Dry run...");
+fn print_warning(rule: &EWarningRule) {
+    match rule {
+        EWarningRule::Note(n) => {
+            info!("[NOTE]\n{}", n.get_comment());
+            info!("Reference: [{}]", n.plugins.join(";"));
+        }
+        EWarningRule::Conflict(c) => {
+            warn!("[CONFLICT]\n{}", c.get_comment());
+            info!("Reference: [{}]", c.plugins.join(";"));
+        }
+        EWarningRule::Requires(r) => {
+            error!("[REQUIRES]\n{}", r.get_comment());
+            info!("Reference: [{}]", r.plugins.join(";"));
+        }
+        EWarningRule::Patch(p) => {
+            warn!("[Patch]\n{}", p.get_comment());
+            info!("Reference: [{}]", p.plugins.join(";"));
+        }
+    }
+    println!();
+}
 
-                    debug!("Old:\n{mods:?}");
-                    debug!("New:\n{result:?}");
+/// Reports the sorted order and writes it to disk unless `dry_run` is set.
+fn apply_result(
+    game: ESupportedGame,
+    mods: &[PluginData],
+    result: &[String],
+    dry_run: bool,
+) -> ExitCode {
+    let unchanged = mods
+        .iter()
+        .map(|f| f.name.to_lowercase())
+        .eq(result.iter().cloned());
 
-                    if mods
-                        .iter()
-                        .map(|f| f.name.to_lowercase())
-                        .collect::<Vec<_>>()
-                        .eq(&result)
-                    {
-                        info!("Mods are in correct order, no sorting needed.");
-                    } else {
-                        info!("New order:\n{result:?}");
-                    }
+    if dry_run {
+        info!("Dry run...");
+        debug!("Old:\n{mods:?}");
+        debug!("New:\n{result:?}");
+    } else {
+        info!("Current:\n{mods:?}");
+    }
 
-                    ExitCode::SUCCESS
-                } else {
-                    info!("Current:\n{mods:?}");
+    if unchanged {
+        info!("Mods are in correct order, no sorting needed.");
+        return ExitCode::SUCCESS;
+    }
 
-                    if mods
-                        .iter()
-                        .map(|f| f.name.to_lowercase())
-                        .collect::<Vec<_>>()
-                        .eq(&result)
-                    {
-                        info!("Mods are in correct order, no sorting needed.");
-                        ExitCode::SUCCESS
-                    } else {
-                        info!("New:\n{result:?}");
+    if dry_run {
+        info!("New order:\n{result:?}");
+        return ExitCode::SUCCESS;
+    }
 
-                        match update_new_load_order(game, &result) {
-                            Ok(()) => {
-                                info!("Update successful");
-                                ExitCode::SUCCESS
-                            }
-                            Err(e) => {
-                                error!("Could not updae load order: {e}");
-                                ExitCode::FAILURE
-                            }
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                error!("error sorting: {e:?}");
-                ExitCode::FAILURE
-            }
+    info!("New:\n{result:?}");
+    match update_new_load_order(game, result) {
+        Ok(()) => {
+            info!("Update successful");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            error!("Could not update load order: {e}");
+            ExitCode::FAILURE
         }
     }
 }

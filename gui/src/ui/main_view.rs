@@ -143,22 +143,16 @@ fn mod_item(
         .find(|(p, _)| p.to_lowercase() == lower)
         .map(|(_, i)| &data.warnings[*i].rule);
 
-    let mut bg_color = first_note.map_or(Color32::TRANSPARENT, |rule| {
-        get_color_for_rule(rule).gamma_multiply(0.5)
-    });
-
-    if !app.plugin_filter.is_empty() && lower == app.plugin_filter.to_lowercase() {
-        bg_color = if dark_mode {
-            Color32::DARK_BLUE
-        } else {
-            Color32::LIGHT_BLUE
-        };
-    }
-
+    let selected = !app.plugin_filter.is_empty() && lower == app.plugin_filter.to_lowercase();
     let hovered_rule = first_note.filter(|_| app.plugin_hover_filter.contains(&lower));
-    if let Some(rule) = hovered_rule {
-        bg_color = get_color_for_rule(rule).to_opaque();
-    }
+    let bg_color = match hovered_rule {
+        Some(rule) => get_color_for_rule(rule).to_opaque(),
+        None if selected && dark_mode => Color32::DARK_BLUE,
+        None if selected => Color32::LIGHT_BLUE,
+        None => first_note.map_or(Color32::TRANSPARENT, |rule| {
+            get_color_for_rule(rule).gamma_multiply(0.5)
+        }),
+    };
 
     egui::Frame::new().fill(bg_color).show(ui, |ui| {
         let label = if hovered_rule.is_some() && dark_mode {

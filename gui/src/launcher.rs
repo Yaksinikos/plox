@@ -115,12 +115,15 @@ fn startup(args: &Args) -> Startup {
     let preselect = if crashed {
         Backend::Glow
     } else {
-        match forced.unwrap_or(config.backend) {
-            RendererChoice::Glow => Backend::Glow,
-            RendererChoice::Wgpu if renderer::wgpu_compiled() => Backend::Wgpu,
-            RendererChoice::Wgpu => Backend::Glow,
-            RendererChoice::Auto if wgpu_adapter.is_some() => Backend::Wgpu,
-            RendererChoice::Auto => Backend::Glow,
+        let wants_wgpu = match forced.unwrap_or(config.backend) {
+            RendererChoice::Glow => false,
+            RendererChoice::Wgpu => renderer::wgpu_compiled(),
+            RendererChoice::Auto => wgpu_adapter.is_some(),
+        };
+        if wants_wgpu {
+            Backend::Wgpu
+        } else {
+            Backend::Glow
         }
     };
     Startup::Chooser(ChooserState::new(preselect, crashed, wgpu_adapter))

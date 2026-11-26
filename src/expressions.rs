@@ -259,11 +259,10 @@ impl NOT {
 impl TExpression for NOT {
     // NOT evaluates as true if the wrapped expression evaluates as true
     fn eval(&self, items: &[PluginData]) -> Option<Vec<String>> {
-        if let Some(_plugins) = self.expression.eval(items) {
-            None
-        } else {
-            // NOT and resolving names
-            Some(vec![self.to_string()])
+        // NOT and resolving names
+        match self.expression.eval(items) {
+            Some(_) => None,
+            None => Some(vec![self.to_string()]),
         }
     }
 }
@@ -442,7 +441,9 @@ impl Display for EVerOperator {
     }
 }
 
-/// The Ver predicate is a special predicate that first tries to match the version number string stored in the plugin header,
+/// The Ver predicate compares a plugin version.
+///
+/// It first tries to match the version number string stored in the plugin header,
 /// and if that fails it tries to match the version number from the plugin filename.
 /// If a version number is found, it can be used in a comparison.
 /// Syntax: [VER operator version plugin.esp]

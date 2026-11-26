@@ -31,6 +31,10 @@ pub enum EModListView {
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent UI toggles that are persisted as-is"
+)]
 pub struct PloxApp {
     #[serde(skip)]
     settings: AppSettings,

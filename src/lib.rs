@@ -105,8 +105,7 @@ fn read_pe_version(path: &PathBuf) -> Option<String> {
 #[must_use]
 pub fn get_game_version(game: ESupportedGame) -> Option<String> {
     match game {
-        ESupportedGame::Morrowind => None,
-        ESupportedGame::Openmw => None,
+        ESupportedGame::Morrowind | ESupportedGame::Openmw => None,
         ESupportedGame::Cyberpunk => {
             let exe_path = PathBuf::from("bin").join("x64").join("Cyberpunk2077.exe");
             if exe_path.exists() {
@@ -442,21 +441,11 @@ const VERSION_REGEX: &str = r"(\d+(?:[_.-]?\d+)*[a-zA-Z]?)";
 /// Get version from filename or description
 #[must_use]
 pub fn get_version(file_name: &str, description: &Option<String>) -> Option<Version> {
-    let mut final_version_str = None;
-
-    // try to get version from description
-    if let Some(desc) = description
-        && let Some(value) = match_desc_version(desc)
-    {
-        final_version_str = Some(value);
-    }
-
-    // try to get version from filename if not found in description
-    if final_version_str.is_none()
-        && let Some(value) = match_filename_version(file_name)
-    {
-        final_version_str = Some(value);
-    }
+    // description first, then the filename
+    let final_version_str = description
+        .as_deref()
+        .and_then(match_desc_version)
+        .or_else(|| match_filename_version(file_name));
 
     if let Some(version) = final_version_str
         && let Some(value) = get_semver(version.as_str())
@@ -609,6 +598,10 @@ where
 }
 
 /// Update on disk
+///
+/// # Errors
+///
+/// Returns an error if the load order cannot be written.
 pub fn update_new_load_order(game: ESupportedGame, result: &[String]) -> std::io::Result<()> {
     match game {
         ESupportedGame::Morrowind => update_tes3(PathBuf::from("Morrowind.ini"), result, false),
@@ -656,6 +649,11 @@ fn update_openmw(result: &[String]) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Writes the load order to `Morrowind.ini` and redates the plugins in `Data Files`.
+///
+/// # Errors
+///
+/// Returns an error if the ini cannot be written or plugins cannot be redated.
 pub fn update_tes3<P: AsRef<Path>>(
     morrowind_ini_path: P,
     result: &[String],
@@ -738,8 +736,13 @@ pub struct Tes3Header {
     pub masters: Option<Vec<(String, u64)>>,
 }
 
+/// Reads the TES3 header of a plugin.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is not a TES3 plugin.
 pub fn parse_header(f: &Path) -> std::io::Result<Tes3Header> {
-    let magic: u32 = 861095252;
+    let magic = u32::from_le_bytes(*b"TES3");
     // read file to binary reader
     let mut reader = std::io::BufReader::new(std::fs::File::open(f)?);
     // read first 4 bytes and check magic
@@ -765,7 +768,7 @@ pub fn parse_header(f: &Path) -> std::io::Result<Tes3Header> {
 }
 
 fn parse_hedr<R: Read + Seek>(reader: &mut R, stream_size: u64) -> std::io::Result<Tes3Header> {
-    let magic: u32 = 1380205896;
+    let magic = u32::from_le_bytes(*b"HEDR");
     // check magic
     let file_magic = reader.read_u32::<LittleEndian>()?;
 
@@ -802,8 +805,8 @@ fn parse_hedr<R: Read + Seek>(reader: &mut R, stream_size: u64) -> std::io::Resu
     // read 4 bytes as u32
     let _num_records = reader.read_u32::<LittleEndian>()?;
 
-    let master_magic: u32 = 1414742349;
-    let data_magic: u32 = 1096040772;
+    let master_magic = u32::from_le_bytes(*b"MAST");
+    let data_magic = u32::from_le_bytes(*b"DATA");
 
     // read masters
     if reader.stream_position()? >= stream_size {
@@ -867,11 +870,11 @@ fn set_file_mtime(path: &Path, unix_secs: u64) -> io::Result<()> {
 
 fn redate_mods(files: &[PathBuf]) -> Result<(), io::Error> {
     let fixed_file_times: HashMap<String, usize> = HashMap::from([
-        ("morrowind.esm".into(), 1024695106),
-        ("tribunal.esm".into(), 1035940926),
-        ("bloodmoon.esm".into(), 1051807050),
+        ("morrowind.esm".into(), 1_024_695_106),
+        ("tribunal.esm".into(), 1_035_940_926),
+        ("bloodmoon.esm".into(), 1_051_807_050),
     ]);
-    let start_time = 1024695106;
+    let start_time = 1_024_695_106;
     let mut current_time = start_time;
     for mod_path in files {
         // Change the modification times of plugin files to be in order of file list, oldest to newest

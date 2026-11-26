@@ -599,7 +599,7 @@ mod integration_tests {
             // check master files
             assert_eq!(
                 header.masters.unwrap(),
-                vec![("Morrowind.esm".to_string(), 79837557_u64),]
+                vec![("Morrowind.esm".to_string(), 79_837_557_u64),]
             );
 
             // check version

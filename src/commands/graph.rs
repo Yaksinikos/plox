@@ -1,14 +1,12 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use log::{error, info};
+use log::error;
 use petgraph::dot::{Config, Dot};
 
-use crate::{
-    ESupportedGame, GRAPH_FILE, PluginData, gather_cp77_mods, gather_openmw_mods, gather_tes3_mods,
-    get_default_rules_dir, get_game_version, parser, read_file_as_list, sorter,
-};
+use crate::{ESupportedGame, GRAPH_FILE, get_game_version, parser, sorter};
 
+/// Writes the dependency graph of the mods as a dot file
 pub fn graph(
     game: ESupportedGame,
     game_folder: &Option<PathBuf>,
@@ -20,30 +18,11 @@ pub fn graph(
         return ExitCode::FAILURE;
     };
 
-    // get default rules dir
-    let rules_dir = if let Some(path) = rules_path {
-        PathBuf::from(path)
-    } else {
-        get_default_rules_dir(game)
-    };
-
+    let rules_dir = super::rules_dir(game, rules_path.as_deref());
     let game_version = get_game_version(game);
-
-    // gather mods (optionally from a list)
-    let mods: Vec<PluginData>;
-    if let Some(modlist_path) = mod_list {
-        mods = read_file_as_list(modlist_path, &game_version);
-    } else {
-        mods = match game {
-            ESupportedGame::Morrowind => gather_tes3_mods(&root),
-            ESupportedGame::Cyberpunk => gather_cp77_mods(&root, &game_version),
-            ESupportedGame::Openmw => gather_openmw_mods(),
-        };
-        if mods.is_empty() {
-            info!("No mods found");
-            return ExitCode::FAILURE;
-        }
-    }
+    let Some(mods) = super::gather(game, &root, mod_list.as_deref(), &game_version) else {
+        return ExitCode::FAILURE;
+    };
 
     let mut parser = parser::get_parser(game, game_version);
     if let Err(e) = parser.parse(rules_dir) {

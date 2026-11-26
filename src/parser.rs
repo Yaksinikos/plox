@@ -269,29 +269,18 @@ impl Parser {
                 continue;
             }
             // lowercase all
-            let mut line = line.to_lowercase();
+            let lower = line.to_lowercase();
 
             // trim inline comments
-            line = if let Some(index) = line.find(';') {
-                line[..index].trim_end().to_owned()
-            } else {
-                line.trim_end().to_owned()
-            };
+            let line = lower
+                .find(';')
+                .map_or(lower.as_str(), |index| &lower[..index])
+                .trim_end()
+                .to_owned();
 
             // we skip empty lines
             if line.trim().is_empty() {
                 continue;
-            }
-
-            fn new_rule(line: &str) -> bool {
-                // check if a new rule has started by matching the first chars to the rules names
-                line.starts_with("[order")
-                    || line.starts_with("[nearstart")
-                    || line.starts_with("[nearend")
-                    || line.starts_with("[note")
-                    || line.starts_with("[conflict")
-                    || line.starts_with("[requires")
-                    || line.starts_with("[patch")
             }
 
             // we are inside a chunk
@@ -393,7 +382,6 @@ impl Parser {
                             // inline rules don't have comments, we just parse the resst of the chunk
                             // now parse rule body
                             ERule::parse(&mut rule, reader, self)?;
-                            Ok(rule)
                         }
                         ERuleType::Multiline => {
                             // construct the body out of each line with comments trimmed
@@ -437,9 +425,9 @@ impl Parser {
                             let body = body.trim();
                             let body_cursor = Cursor::new(body);
                             ERule::parse(&mut rule, body_cursor, self)?;
-                            Ok(rule)
                         }
                     }
+                    Ok(rule)
                 } else {
                     Err(Error::other("Parsing error: unknown rule"))
                 }
@@ -453,15 +441,7 @@ impl Parser {
 
     #[must_use]
     pub fn ends_with_vec(&self, current_buffer: &str) -> bool {
-        let mut b = false;
-        for ext in &self.ext {
-            if current_buffer.ends_with(ext) {
-                b = true;
-                break;
-            }
-        }
-
-        b
+        self.ext.iter().any(|ext| current_buffer.ends_with(ext))
     }
     fn ends_with_vec_whitespace(&self, current_buffer: &str) -> bool {
         let mut b = false;
@@ -490,18 +470,8 @@ impl Parser {
 
     /// Splits a String into string tokens (either separated by extension or wrapped in quotation marks)
     #[must_use]
-    pub fn tokenize(&self, line: String) -> Vec<String> {
+    pub fn tokenize(&self, line: &str) -> Vec<String> {
         let mut tokens: Vec<String> = vec![];
-
-        // ignore everything after ;
-        let line = line;
-        if line.contains(';') {
-            line.split(';')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .clone_into(&mut line.clone());
-        }
 
         let mut is_quoted = false;
         let mut current_token: String = String::new();
@@ -579,22 +549,15 @@ impl Parser {
                     // TODO get the list from the traits
                     // we reached the end of the current expression
                     let trimmed = current_buffer.trim();
-                    if starts_with_whitespace(trimmed, "[any")
-                        || starts_with_whitespace(trimmed, "[all")
-                        || starts_with_whitespace(trimmed, "[not")
-                        || starts_with_whitespace(trimmed, "[desc")
-                        || starts_with_whitespace(trimmed, "[size")
-                        || starts_with_whitespace(trimmed, "[ver")
-                        || starts_with_whitespace(trimmed, "[gver")
+                    is_expr = false;
+                    if EXPRESSIONS
+                        .iter()
+                        .any(|e| starts_with_whitespace(trimmed, e))
                     {
-                        is_expr = false;
                         chunks.push((trimmed.to_owned(), true));
-
                         current_buffer.clear();
                     } else {
-                        // not a valid expression
-                        // move into token
-                        is_expr = false;
+                        // not a valid expression, move into token
                         is_token = true;
                     }
                 }
@@ -645,6 +608,22 @@ impl Parser {
         Ok(expressions)
     }
 
+    /// Parses `expr` and checks that it is exactly one atomic expression
+    fn single_atomic(&self, expr: &str, kind: &str) -> Result<Atomic> {
+        let expressions = self.parse_expressions(expr.as_bytes())?;
+        if expressions.len() != 1 {
+            return Err(Error::other(format!(
+                "Parsing error: {kind} expression must have exactly one child expression"
+            )));
+        }
+        match expressions.into_iter().next() {
+            Some(Expression::Atomic(atomic)) => Ok(atomic),
+            _ => Err(Error::other(format!(
+                "Parsing error: {kind} expression must have an atomic child expression"
+            ))),
+        }
+    }
+
     /// Parses a single expression from a buffer
     ///
     /// # Errors
@@ -666,115 +645,35 @@ impl Parser {
             // is an expression
             // parse the kind and reurse down
             if let Some(rest) = reader.strip_prefix("[any") {
-                let expressions =
-                    self.parse_expressions(rest[..rest.len() - 1].trim_start().as_bytes())?;
+                let expressions = self.parse_expressions(body_of(rest).as_bytes())?;
                 let expr = ANY::new(expressions);
                 Ok(expr.into())
             } else if let Some(rest) = reader.strip_prefix("[all") {
-                let expressions =
-                    self.parse_expressions(rest[..rest.len() - 1].trim_start().as_bytes())?;
+                let expressions = self.parse_expressions(body_of(rest).as_bytes())?;
                 let expr = ALL::new(expressions);
                 Ok(expr.into())
             } else if let Some(rest) = reader.strip_prefix("[not") {
-                let expressions =
-                    self.parse_expressions(rest[..rest.len() - 1].trim_start().as_bytes())?;
-                if let Some(first) = expressions.into_iter().last() {
-                    let expr = NOT::new(first);
-                    Ok(expr.into())
-                } else {
-                    Err(Error::other("Parsing error: unknown expression"))
-                }
+                let expressions = self.parse_expressions(body_of(rest).as_bytes())?;
+                expressions.into_iter().last().map_or_else(
+                    || Err(Error::other("Parsing error: unknown expression")),
+                    |first| Ok(NOT::new(first).into()),
+                )
             } else if let Some(rest) = reader.strip_prefix("[desc") {
-                let body = rest[..rest.len() - 1].trim_start();
-                if let Some((expr, regex, negated)) = parse_desc(body) {
-                    // do something
-                    let expressions = self.parse_expressions(expr.as_bytes())?;
-                    // check that it is of len 1
-                    if expressions.len() != 1 {
-                        return Err(Error::other(
-                            "Parsing error: DESC expression must have exactly one child expression",
-                        ));
-                    }
-
-                    // check that the child expression is an atomic
-                    if let Some(Expression::Atomic(atomic)) = expressions.first() {
-                        let expr = DESC::new(atomic.clone(), regex, negated);
-                        return Ok(expr.into());
-                    }
-
-                    return Err(Error::other(
-                        "Parsing error: DESC expression must have an atomic child expression",
-                    ));
-                }
-                Err(Error::other("Parsing error: unknown expression"))
+                let (expr, regex, negated) = parse_desc(body_of(rest)).ok_or_else(unknown)?;
+                let atomic = self.single_atomic(&expr, "DESC")?;
+                Ok(DESC::new(atomic, regex, negated).into())
             } else if let Some(rest) = reader.strip_prefix("[size") {
-                let body = rest[..rest.len() - 1].trim_start();
-                if let Some((expr, size, negated)) = parse_size(body) {
-                    // do something
-                    let expressions = self.parse_expressions(expr.as_bytes())?;
-                    // check that it is of len 1
-                    if expressions.len() != 1 {
-                        return Err(Error::other(
-                            "Parsing error: SIZE expression must have exactly one child expression",
-                        ));
-                    }
-                    // check that the child expression is an atomic
-                    if let Some(Expression::Atomic(atomic)) = expressions.first() {
-                        let expr = SIZE::new(atomic.clone(), size, negated);
-                        return Ok(expr.into());
-                    }
-
-                    return Err(Error::other(
-                        "Parsing error: SIZE expression must have an atomic child expression",
-                    ));
-                }
-                Err(Error::other("Parsing error: unknown expression"))
+                let (expr, size, negated) = parse_size(body_of(rest)).ok_or_else(unknown)?;
+                let atomic = self.single_atomic(&expr, "SIZE")?;
+                Ok(SIZE::new(atomic, size, negated).into())
             } else if let Some(rest) = reader.strip_prefix("[ver") {
-                let body = rest[..rest.len() - 1].trim_start();
-                if let Some((expr, operator, version)) = parse_ver(body) {
-                    // do something
-                    let expressions = self.parse_expressions(expr.as_bytes())?;
-                    // check that it is of len 1
-                    if expressions.len() != 1 {
-                        return Err(Error::other(
-                            "Parsing error: VER expression must have exactly one child expression",
-                        ));
-                    }
-
-                    // check that the child expression is an atomic
-                    if let Some(Expression::Atomic(atomic)) = expressions.first() {
-                        let expr = VER::new(atomic.clone(), operator, version.to_string());
-                        return Ok(expr.into());
-                    }
-
-                    return Err(Error::other(
-                        "Parsing error: VER expression must have an atomic child expression",
-                    ));
-                }
-                Err(Error::other("Parsing error: unknown expression"))
+                let (expr, operator, version) = parse_ver(body_of(rest)).ok_or_else(unknown)?;
+                let atomic = self.single_atomic(&expr, "VER")?;
+                Ok(VER::new(atomic, operator, version.to_string()).into())
             } else if let Some(rest) = reader.strip_prefix("[gver") {
-                let body = rest[..rest.len() - 1].trim_start();
-                if let Some((expr, operator, version)) = parse_gver(body) {
-                    // do something
-                    let expressions = self.parse_expressions(expr.as_bytes())?;
-                    // check that it is of len 1
-                    if expressions.len() != 1 {
-                        return Err(Error::other(
-                            "Parsing error: GVER expression must have exactly one child expression",
-                        ));
-                    }
-
-                    // check that the child expression is an atomic
-                    if let Some(Expression::Atomic(atomic)) = expressions.first() {
-                        let expr = GVER::new(atomic.clone(), operator, version.to_string());
-                        return Ok(expr.into());
-                    }
-
-                    return Err(Error::other(
-                        "Parsing error: GVER expression must have an atomic child expression",
-                    ));
-                }
-                Err(Error::other("Parsing error: unknown expression"))
+                let (expr, operator, version) = parse_gver(body_of(rest)).ok_or_else(unknown)?;
+                let atomic = self.single_atomic(&expr, "GVER")?;
+                Ok(GVER::new(atomic, operator, version.to_string()).into())
             } else {
                 // unknown expression
                 Err(Error::other("Parsing error: unknown expression"))
@@ -784,6 +683,33 @@ impl Parser {
         }
     }
 }
+
+/// Body of an expression after its keyword, without the closing bracket
+fn body_of(rest: &str) -> &str {
+    rest.strip_suffix(']').unwrap_or(rest).trim_start()
+}
+
+fn unknown() -> Error {
+    Error::other("Parsing error: unknown expression")
+}
+
+/// Checks if a new rule has started by matching the first chars to the rules names
+fn new_rule(line: &str) -> bool {
+    [
+        "[order",
+        "[nearstart",
+        "[nearend",
+        "[note",
+        "[conflict",
+        "[requires",
+        "[patch",
+    ]
+    .iter()
+    .any(|prefix| line.starts_with(prefix))
+}
+
+/// Expression keywords
+const EXPRESSIONS: [&str; 7] = ["[any", "[all", "[not", "[desc", "[size", "[ver", "[gver"];
 
 fn starts_with_whitespace(current_buffer: &str, arg: &str) -> bool {
     current_buffer.starts_with(format!("{arg} ").as_str())
@@ -970,8 +896,7 @@ where
 
     // first check if there is a coment inside the rule expression
     let rule_expression = String::from_utf8_lossy(&buffer).trim().to_owned();
-    let split = rule_expression.split_whitespace().collect::<Vec<_>>();
-    if split.len() > 1 {
+    if rule_expression.split_whitespace().nth(1).is_some() {
         // must be inline
         Ok((rule_expression, ERuleType::Inline))
     } else {
@@ -1050,7 +975,7 @@ mod tests {
                 .iter()
                 .map(|f| f.trim().trim_matches('"').trim())
                 .collect::<Vec<_>>();
-            assert_eq!(expected, parser.tokenize(input).as_slice());
+            assert_eq!(expected, parser.tokenize(&input).as_slice());
         }
     }
 }

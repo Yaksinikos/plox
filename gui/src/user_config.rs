@@ -52,16 +52,16 @@ impl RendererConfig {
         let Some(path) = config_file() else {
             return Self::default();
         };
-        match std::fs::read_to_string(&path) {
-            Ok(s) => toml::from_str::<UserConfigFile>(&s).map_or_else(
-                |e| {
-                    warn!("Invalid user config {}: {e}", path.display());
-                    Self::default()
-                },
-                |c| c.renderer,
-            ),
-            Err(_) => Self::default(),
-        }
+        let Ok(s) = std::fs::read_to_string(&path) else {
+            return Self::default();
+        };
+        toml::from_str::<UserConfigFile>(&s).map_or_else(
+            |e| {
+                warn!("Invalid user config {}: {e}", path.display());
+                Self::default()
+            },
+            |c| c.renderer,
+        )
     }
 
     pub fn save(&self) {
