@@ -185,7 +185,7 @@ fn restart_on_glow(args: &Args) -> ExitCode {
 
 fn native_options(backend: Backend) -> eframe::NativeOptions {
     let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([400.0, 300.0])
+        .with_inner_size([640.0, 512.0])
         .with_min_inner_size([300.0, 220.0])
         .with_app_id("plox");
     match eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon-256.png")) {
