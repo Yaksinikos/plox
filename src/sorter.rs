@@ -113,9 +113,10 @@ impl Sorter {
             if let Some(results) = wild_contains(&mods, &nearstart) {
                 // push to start of mods
                 for r in results {
-                    let index = mods.iter().position(|f| f == &r).unwrap();
-                    let element = mods.remove(index);
-                    mods.insert(0, element);
+                    if let Some(index) = mods.iter().position(|f| f == &r) {
+                        let element = mods.remove(index);
+                        mods.insert(0, element);
+                    }
                 }
             }
         }
@@ -130,9 +131,10 @@ impl Sorter {
             if let Some(results) = wild_contains(&mods, &nearend) {
                 // push to end of mods
                 for r in results {
-                    let index = mods.iter().position(|f| f == &r).unwrap();
-                    let element = mods.remove(index);
-                    mods.push(element);
+                    if let Some(index) = mods.iter().position(|f| f == &r) {
+                        let element = mods.remove(index);
+                        mods.push(element);
+                    }
                 }
             }
         }
@@ -183,8 +185,7 @@ impl Sorter {
                     //     mods_copy.insert(0, element);
                     // }
 
-                    if mods.contains(&"morrowind.esm".into()) {
-                        let index = mods.iter().position(|f| f == "morrowind.esm").unwrap();
+                    if let Some(index) = mods.iter().position(|f| f == "morrowind.esm") {
                         let element = mods.remove(index);
                         mods.insert(0, element);
                     }
@@ -213,10 +214,9 @@ impl Sorter {
         // TODO find cycle
         {
             let viz = petgraph::dot::Dot::with_config(&g, &[petgraph::dot::Config::EdgeNoLabel]);
-            // write to file
-            let mut file = std::fs::File::create(GRAPH_FILE).expect("file create failed");
-            std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes())
-                .expect("write failed");
+            if let Err(e) = std::fs::write(GRAPH_FILE, format!("{viz:?}")) {
+                log::error!("Could not write {GRAPH_FILE}: {e}");
+            }
         }
 
         log::error!("Out of iterations");
@@ -233,7 +233,8 @@ impl Sorter {
         last_index: &mut usize,
     ) -> bool {
         match self.sort_type {
-            ESortType::Unstable => panic!("not supported"),
+            // the unstable sort is done by petgraph and never iterates
+            ESortType::Unstable => false,
             ESortType::StableOpt => {
                 Self::stable_topo_sort_opt2(n, edges, index_dict_rev, result, last_index)
             }
@@ -284,8 +285,12 @@ impl Sorter {
             let x = &index_dict_rev[&i];
             let y = &index_dict_rev[&j];
 
-            let idx_of_x = result.iter().position(|f| f == x).unwrap();
-            let idx_of_y = result.iter().position(|f| f == y).unwrap();
+            let (Some(idx_of_x), Some(idx_of_y)) = (
+                result.iter().position(|f| f == x),
+                result.iter().position(|f| f == y),
+            ) else {
+                continue;
+            };
 
             // if i not before j x should be before y
             if idx_of_x > idx_of_y {

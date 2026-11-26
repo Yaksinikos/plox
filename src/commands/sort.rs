@@ -1,10 +1,10 @@
+use std::path::PathBuf;
 use std::process::ExitCode;
-use std::{env, path::PathBuf};
 
 use log::{debug, error, info, warn};
 
 use crate::{
-    ESupportedGame, EWarningRule, PluginData, TParser, TWarningRule, download_latest_rules,
+    ESupportedGame, EWarningRule, PluginData, TWarningRule, download_latest_rules,
     gather_cp77_mods, gather_openmw_mods, gather_tes3_mods, get_default_rules_dir,
     get_game_version, parser, read_file_as_list, sorter, update_new_load_order,
 };
@@ -30,9 +30,8 @@ pub fn sort(options: CliSortOptions) -> ExitCode {
     let no_download = options.no_download;
 
     // get game root
-    let root = match root {
-        Some(path) => path,
-        None => env::current_dir().expect("No current working dir"),
+    let Some(root) = super::game_root(root.as_deref()) else {
+        return ExitCode::FAILURE;
     };
 
     // get default rules dir

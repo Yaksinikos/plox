@@ -415,6 +415,16 @@ impl Display for SIZE {
 ////////////////////////////////////////////////////////////////////////
 // VER
 
+/// Compares `actual` against `version` with `op` (`<`, `=` or `>`).
+/// Invalid rule versions never match (the parser validates them beforehand).
+fn version_matches(op: char, version: &str, actual: &semver::Version) -> bool {
+    let Ok(version) = semver::Version::parse(version) else {
+        log::warn!("Invalid version in rule: {version}");
+        return false;
+    };
+    VersionReq::parse(&format!("{op}{version}")).is_ok_and(|req| req.matches(actual))
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum EVerOperator {
     Less,
@@ -459,24 +469,12 @@ impl TExpression for VER {
             let mut results = vec![];
             for p in &plugins {
                 if let Some(plugin_version) = &p.version {
-                    // we can unwrap here because we know the version is valid
-                    let semversion = semver::Version::parse(&self.version).unwrap();
-                    let matches = match self.operator {
-                        EVerOperator::Less => {
-                            let req = VersionReq::parse(format!("<{semversion}").as_str()).unwrap();
-                            req.matches(plugin_version)
-                        }
-                        EVerOperator::Equal => {
-                            let req = VersionReq::parse(format!("={semversion}").as_str()).unwrap();
-                            req.matches(plugin_version)
-                        }
-                        EVerOperator::Greater => {
-                            let req = VersionReq::parse(format!(">{semversion}").as_str()).unwrap();
-                            req.matches(plugin_version)
-                        }
+                    let op = match self.operator {
+                        EVerOperator::Less => '<',
+                        EVerOperator::Equal => '=',
+                        EVerOperator::Greater => '>',
                     };
-
-                    if matches {
+                    if version_matches(op, &self.version, plugin_version) {
                         results.push(p.name.clone());
                     }
                 }
@@ -557,24 +555,12 @@ impl TExpression for GVER {
             let mut results = vec![];
             for p in &plugins {
                 if let Some(game_version) = &p.game_version {
-                    // we can unwrap here because we know the version is valid
-                    let semversion = semver::Version::parse(&self.version).unwrap();
-                    let matches = match self.operator {
-                        EGVerOperator::Less => {
-                            let req = VersionReq::parse(format!("<{semversion}").as_str()).unwrap();
-                            req.matches(game_version)
-                        }
-                        EGVerOperator::Equal => {
-                            let req = VersionReq::parse(format!("={semversion}").as_str()).unwrap();
-                            req.matches(game_version)
-                        }
-                        EGVerOperator::Greater => {
-                            let req = VersionReq::parse(format!(">{semversion}").as_str()).unwrap();
-                            req.matches(game_version)
-                        }
+                    let op = match self.operator {
+                        EGVerOperator::Less => '<',
+                        EGVerOperator::Equal => '=',
+                        EGVerOperator::Greater => '>',
                     };
-
-                    if matches {
+                    if version_matches(op, &self.version, game_version) {
                         results.push(p.name.clone());
                     }
                 }

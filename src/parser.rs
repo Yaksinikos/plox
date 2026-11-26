@@ -10,8 +10,7 @@ use log::{debug, info, warn};
 use crate::{
     ESupportedGame, PluginData, TParser,
     expressions::{
-        ALL, ANY, Atomic, DESC, EGVerOperator, EVerOperator, Expression, GVER, NOT, SIZE,
-        TExpression, VER,
+        ALL, ANY, Atomic, DESC, EGVerOperator, EVerOperator, Expression, GVER, NOT, SIZE, VER,
     },
     rules::{
         Conflict, EOrderRule, ERule, EWarningRule, NearEnd, NearStart, Note, Order, Patch,
@@ -332,8 +331,7 @@ impl Parser {
                 Err(err) => {
                     // log error and skip chunk
                     debug!("Error '{err}' at chunk #{idx}, starting at line: {info}");
-                    let string = String::from_utf8(chunk.data).expect("not valid utf8");
-                    debug!("{string}");
+                    debug!("{}", String::from_utf8_lossy(&chunk.data));
                 }
             }
         }

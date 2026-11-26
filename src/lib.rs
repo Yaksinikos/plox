@@ -3,12 +3,16 @@ use std::error::Error;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Read, Seek, Write};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::{env, vec};
 
 use clap::ValueEnum;
 
 pub mod commands;
 pub use commands::*;
+
+pub mod error;
+pub use error::PloxError;
 
 pub mod expressions;
 pub mod parser;
@@ -175,7 +179,7 @@ where
     let response = reqwest::blocking::get(url)?;
 
     // get response body
-    let body = &mut response.bytes().unwrap();
+    let body = &mut response.bytes()?;
 
     // hash check
     let hash_path = output_path.as_ref().with_extension("hash");
@@ -345,18 +349,8 @@ where
     let mut plugins = get_plugins_in_folder(path, use_omw_plugins);
 
     // sort
-    plugins.sort_by(|a, b| {
-        fs::metadata(a.clone())
-            .expect("filetime")
-            .modified()
-            .unwrap()
-            .cmp(
-                &fs::metadata(b.clone())
-                    .expect("filetime")
-                    .modified()
-                    .unwrap(),
-            )
-    });
+    // unreadable timestamps sort first
+    plugins.sort_by_cached_key(|p| fs::metadata(p).and_then(|m| m.modified()).ok());
     plugins
 }
 
@@ -416,7 +410,7 @@ fn map_data(f: &Path) -> Option<PluginData> {
     if let Some(file_name) = f.file_name().and_then(|n| n.to_str()) {
         let mut data = PluginData {
             name: file_name.to_owned(),
-            size: f.metadata().unwrap().len(),
+            size: f.metadata().map_or(0, |m| m.len()),
             description: None,
             version: None,
             masters: None,
@@ -494,9 +488,9 @@ fn get_semver(version: &str) -> Option<Version> {
 ///
 /// Panics if the regex pattern is invalid
 fn match_filename_version(file_name: &str) -> Option<String> {
-    let filename_version_regex = format!(r"\D{VERSION_REGEX}\D*");
-    let pattern: Regex = Regex::new(filename_version_regex.as_str()).unwrap();
-    if let Some(captures) = pattern.captures(file_name)
+    static PATTERN: LazyLock<Option<Regex>> =
+        LazyLock::new(|| Regex::new(&format!(r"\D{VERSION_REGEX}\D*")).ok());
+    if let Some(captures) = PATTERN.as_ref()?.captures(file_name)
         && let Some(version) = captures.get(1)
     {
         return Some(version.as_str().to_string());
@@ -510,9 +504,13 @@ fn match_filename_version(file_name: &str) -> Option<String> {
 ///
 /// Panics if the regex pattern is invalid
 fn match_desc_version(desc: &str) -> Option<String> {
-    let header_version_regex = format!(r"\b(?:version\b\D+|v(?:er)?\.?\s*){VERSION_REGEX}");
-    let pattern: Regex = Regex::new(header_version_regex.as_str()).unwrap();
-    if let Some(captures) = pattern.captures(desc)
+    static PATTERN: LazyLock<Option<Regex>> = LazyLock::new(|| {
+        Regex::new(&format!(
+            r"\b(?:version\b\D+|v(?:er)?\.?\s*){VERSION_REGEX}"
+        ))
+        .ok()
+    });
+    if let Some(captures) = PATTERN.as_ref()?.captures(desc)
         && let Some(version) = captures.get(1)
     {
         return Some(version.as_str().to_string());
@@ -592,7 +590,7 @@ where
                 {
                     let data = PluginData {
                         name: file_name.to_owned(),
-                        size: e.metadata().unwrap().len(),
+                        size: e.metadata().map_or(0, |m| m.len()),
                         description: None,
                         version: None,
                         masters: None,
@@ -621,7 +619,10 @@ pub fn update_new_load_order(game: ESupportedGame, result: &[String]) -> std::io
 
 fn update_cp77(_result: &[String]) -> std::io::Result<()> {
     // TODO CP77 update mods
-    panic!("Not implemented")
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Updating the Cyberpunk 2077 load order is not supported yet",
+    ))
 }
 
 fn update_openmw(result: &[String]) -> std::io::Result<()> {
@@ -713,9 +714,11 @@ pub fn check_order(result: &[String], order_rules: &[EOrderRule]) -> bool {
         {
             for i in &results_for_a {
                 for j in &results_for_b {
-                    let pos_a = result.iter().position(|x| x == i).unwrap();
-                    let pos_b = result.iter().position(|x| x == j).unwrap();
-                    if pos_a > pos_b {
+                    let pos_a = result.iter().position(|x| x == i);
+                    let pos_b = result.iter().position(|x| x == j);
+                    if let (Some(pos_a), Some(pos_b)) = (pos_a, pos_b)
+                        && pos_a > pos_b
+                    {
                         return false;
                     }
                 }
@@ -873,8 +876,11 @@ fn redate_mods(files: &[PathBuf]) -> Result<(), io::Error> {
     for mod_path in files {
         // Change the modification times of plugin files to be in order of file list, oldest to newest
         // check if is a fixed file time file
-        let filename = mod_path.file_name().unwrap().to_str().unwrap();
-        if let Some(time) = fixed_file_times.get(&filename.to_lowercase()) {
+        let filename = mod_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if let Some(time) = fixed_file_times.get(&filename) {
             current_time = *time as u64;
         } else {
             // set the time to start time + 60

@@ -4,8 +4,8 @@ use std::process::ExitCode;
 use log::{error, info, warn};
 
 use crate::{
-    ESupportedGame, TParser, debug_get_mods_from_order_rules, get_default_rules_dir,
-    get_game_version, parser, sorter,
+    ESupportedGame, debug_get_mods_from_order_rules, get_default_rules_dir, get_game_version,
+    parser, sorter,
 };
 
 /// Verifies integrity of the specified rules

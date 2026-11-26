@@ -1,12 +1,12 @@
+use std::path::PathBuf;
 use std::process::ExitCode;
-use std::{env, path::PathBuf};
 
 use log::{error, info};
 use petgraph::dot::{Config, Dot};
 
 use crate::{
-    ESupportedGame, GRAPH_FILE, PluginData, TParser, gather_cp77_mods, gather_openmw_mods,
-    gather_tes3_mods, get_default_rules_dir, get_game_version, parser, read_file_as_list, sorter,
+    ESupportedGame, GRAPH_FILE, PluginData, gather_cp77_mods, gather_openmw_mods, gather_tes3_mods,
+    get_default_rules_dir, get_game_version, parser, read_file_as_list, sorter,
 };
 
 pub fn graph(
@@ -16,9 +16,8 @@ pub fn graph(
     mod_list: &Option<PathBuf>,
 ) -> ExitCode {
     // get game root
-    let root = match game_folder {
-        Some(path) => path.clone(),
-        None => env::current_dir().expect("No current working dir"),
+    let Some(root) = super::game_root(game_folder.as_deref()) else {
+        return ExitCode::FAILURE;
     };
 
     // get default rules dir
@@ -55,11 +54,10 @@ pub fn graph(
     let data = sorter::get_graph_data(&mods, &parser.order_rules, &parser.warning_rules);
     let g = sorter::build_graph(&data);
 
-    {
-        let viz = Dot::with_config(&g, &[Config::EdgeNoLabel]);
-        // write to file
-        let mut file = std::fs::File::create(GRAPH_FILE).expect("file create failed");
-        std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes()).expect("write failed");
+    let viz = Dot::with_config(&g, &[Config::EdgeNoLabel]);
+    if let Err(e) = std::fs::write(GRAPH_FILE, format!("{viz:?}")) {
+        error!("Could not write {GRAPH_FILE}: {e}");
+        return ExitCode::FAILURE;
     }
 
     ExitCode::SUCCESS
