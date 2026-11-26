@@ -487,7 +487,8 @@ mod integration_tests {
         parser.init_from_file("./tests/mlox/mlox_base.txt")?;
         let mut mods = debug_get_mods_from_order_rules(&parser.order_rules);
 
-        let mut rng = rng();
+        // fixed seed, so a failure can be reproduced
+        let mut rng = <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(0x706c_6f78);
         mods.shuffle(&mut rng);
         let mods = mods.into_iter().take(100).collect::<Vec<_>>();
 
@@ -508,7 +509,21 @@ mod integration_tests {
             )
             .expect("opt rules contain a cycle");
 
-        assert_eq!(full_result, opt_result);
+        // both sorters must satisfy every rule; plugins without a rule between them may be
+        // ordered differently, so the results are not compared with each other
+        assert!(
+            order_ok(&full_result, &mods, &parser),
+            "full order is wrong"
+        );
+        assert!(order_ok(&opt_result, &mods, &parser), "opt order is wrong");
+        let mut full_sorted = full_result;
+        let mut opt_sorted = opt_result;
+        full_sorted.sort();
+        opt_sorted.sort();
+        assert_eq!(
+            full_sorted, opt_sorted,
+            "sorters returned different plugins"
+        );
 
         Ok(())
     }
