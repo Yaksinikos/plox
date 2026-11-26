@@ -331,21 +331,21 @@ pub fn get_graph_data(
     let order_pairs = get_ordering_from_order_rules(order_rules);
     let mut edges: Vec<(usize, usize)> = vec![];
     for (a, b) in order_pairs {
-        if let Some(results_for_a) = wild_contains(&mods, &a) {
-            if let Some(results_for_b) = wild_contains(&mods, &b) {
-                // foreach esp i, add an edge to all esps j
-                for i in &results_for_a {
-                    for j in &results_for_b {
-                        if i == j {
-                            warn!("Skipping circular edge: {}", i);
-                            continue;
-                        }
-                        let idx_a = index_dict[i.as_str()];
-                        let idx_b = index_dict[j.as_str()];
+        if let Some(results_for_a) = wild_contains(&mods, &a)
+            && let Some(results_for_b) = wild_contains(&mods, &b)
+        {
+            // foreach esp i, add an edge to all esps j
+            for i in &results_for_a {
+                for j in &results_for_b {
+                    if i == j {
+                        warn!("Skipping circular edge: {}", i);
+                        continue;
+                    }
+                    let idx_a = index_dict[i.as_str()];
+                    let idx_b = index_dict[j.as_str()];
 
-                        if !edges.contains(&(idx_a, idx_b)) {
-                            edges.push((idx_a, idx_b));
-                        }
+                    if !edges.contains(&(idx_a, idx_b)) {
+                        edges.push((idx_a, idx_b));
                     }
                 }
             }

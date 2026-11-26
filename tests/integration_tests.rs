@@ -26,23 +26,23 @@ mod integration_tests {
         let mut warning_rules = warning_rules.to_vec();
         for rule in warning_rules.iter_mut() {
             // only conflict rules
-            if let EWarningRule::Conflict(ref mut conflict) = rule {
-                if conflict.eval(plugins) {
-                    // remove mods
-                    // switch on the len of conflict.conflicts
-                    let groups_size = conflict.conflicts.len();
-                    if groups_size == 2 {
-                        // remove all mods of group 1
-                        for mod_name in &conflict.conflicts[0] {
-                            // add if not already in
-                            if !mods_to_remove.contains(mod_name) {
-                                mods_to_remove.push(mod_name.clone());
-                            }
+            if let EWarningRule::Conflict(conflict) = rule
+                && conflict.eval(plugins)
+            {
+                // remove mods
+                // switch on the len of conflict.conflicts
+                let groups_size = conflict.conflicts.len();
+                if groups_size == 2 {
+                    // remove all mods of group 1
+                    for mod_name in &conflict.conflicts[0] {
+                        // add if not already in
+                        if !mods_to_remove.contains(mod_name) {
+                            mods_to_remove.push(mod_name.clone());
                         }
-                    } else {
-                        // TODO do nothing for now
-                        //warn!("groups_size: {}", groups_size);
                     }
+                } else {
+                    // TODO do nothing for now
+                    //warn!("groups_size: {}", groups_size);
                 }
             }
         }

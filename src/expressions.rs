@@ -303,19 +303,19 @@ impl TExpression for DESC {
         if let Some(plugins) = wild_contains_data(items, &self.expression.item) {
             let mut results = vec![];
             for p in &plugins {
-                if let Some(description) = &p.description {
-                    if let Ok(pattern) = regex::Regex::new(&self.regex) {
-                        let description = &description.to_lowercase();
-                        match self.is_negated {
-                            true => {
-                                if !pattern.is_match(description) {
-                                    results.push(p.name.clone());
-                                }
+                if let Some(description) = &p.description
+                    && let Ok(pattern) = regex::Regex::new(&self.regex)
+                {
+                    let description = &description.to_lowercase();
+                    match self.is_negated {
+                        true => {
+                            if !pattern.is_match(description) {
+                                results.push(p.name.clone());
                             }
-                            false => {
-                                if pattern.is_match(description) {
-                                    results.push(p.name.clone());
-                                }
+                        }
+                        false => {
+                            if pattern.is_match(description) {
+                                results.push(p.name.clone());
                             }
                         }
                     }

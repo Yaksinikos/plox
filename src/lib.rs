@@ -79,18 +79,14 @@ pub fn detect_game() -> Option<ESupportedGame> {
 fn read_pe_version(path: &PathBuf) -> Option<String> {
     use pelite::pe64::{Pe, PeFile};
 
-    if let Ok(map) = pelite::FileMap::open(path) {
-        if let Ok(file) = PeFile::from_bytes(&map) {
-            if let Ok(resources) = file.resources() {
-                if let Ok(version_info) = resources.version_info() {
-                    if let Some(language) = version_info.translation().first() {
-                        if let Some(version) = version_info.value(*language, "ProductVersion") {
-                            return Some(version);
-                        }
-                    }
-                }
-            }
-        }
+    if let Ok(map) = pelite::FileMap::open(path)
+        && let Ok(file) = PeFile::from_bytes(&map)
+        && let Ok(resources) = file.resources()
+        && let Ok(version_info) = resources.version_info()
+        && let Some(language) = version_info.translation().first()
+        && let Some(version) = version_info.value(*language, "ProductVersion")
+    {
+        return Some(version);
     }
 
     None
@@ -312,17 +308,17 @@ where
         plugins.for_each(|p| {
             if let Ok(file) = p {
                 let file_path = file.path();
-                if !file_path.is_dir() {
-                    if let Some(ext_os) = file_path.extension() {
-                        let ext = ext_os.to_ascii_lowercase();
-                        if ext == "esm"
-                            || ext == "esp"
-                            || (use_omw_plugins && ext == "omwaddon")
-                            || (use_omw_plugins && ext == "omwscripts")
-                            || (use_omw_plugins && ext == "omwgame")
-                        {
-                            results.push(file_path);
-                        }
+                if !file_path.is_dir()
+                    && let Some(ext_os) = file_path.extension()
+                {
+                    let ext = ext_os.to_ascii_lowercase();
+                    if ext == "esm"
+                        || ext == "esp"
+                        || (use_omw_plugins && ext == "omwaddon")
+                        || (use_omw_plugins && ext == "omwscripts")
+                        || (use_omw_plugins && ext == "omwgame")
+                    {
+                        results.push(file_path);
                     }
                 }
             }
@@ -443,23 +439,23 @@ pub fn get_version(file_name: &str, description: &Option<String>) -> Option<Vers
     let mut final_version_str = None;
 
     // try to get version from description
-    if let Some(desc) = description {
-        if let Some(value) = match_desc_version(desc) {
-            final_version_str = Some(value);
-        }
+    if let Some(desc) = description
+        && let Some(value) = match_desc_version(desc)
+    {
+        final_version_str = Some(value);
     }
 
     // try to get version from filename if not found in description
-    if final_version_str.is_none() {
-        if let Some(value) = match_filename_version(file_name) {
-            final_version_str = Some(value);
-        }
+    if final_version_str.is_none()
+        && let Some(value) = match_filename_version(file_name)
+    {
+        final_version_str = Some(value);
     }
 
-    if let Some(version) = final_version_str {
-        if let Some(value) = get_semver(version.as_str()) {
-            return Some(value);
-        }
+    if let Some(version) = final_version_str
+        && let Some(value) = get_semver(version.as_str())
+    {
+        return Some(value);
     }
 
     None
@@ -488,10 +484,10 @@ fn get_semver(version: &str) -> Option<Version> {
 fn match_filename_version(file_name: &str) -> Option<String> {
     let filename_version_regex = format!(r"\D{}\D*", VERSION_REGEX);
     let pattern: Regex = Regex::new(filename_version_regex.as_str()).unwrap();
-    if let Some(captures) = pattern.captures(file_name) {
-        if let Some(version) = captures.get(1) {
-            return Some(version.as_str().to_string());
-        }
+    if let Some(captures) = pattern.captures(file_name)
+        && let Some(version) = captures.get(1)
+    {
+        return Some(version.as_str().to_string());
     }
     None
 }
@@ -504,10 +500,10 @@ fn match_filename_version(file_name: &str) -> Option<String> {
 fn match_desc_version(desc: &str) -> Option<String> {
     let header_version_regex = format!(r"\b(?:version\b\D+|v(?:er)?\.?\s*){}", VERSION_REGEX);
     let pattern: Regex = Regex::new(header_version_regex.as_str()).unwrap();
-    if let Some(captures) = pattern.captures(desc) {
-        if let Some(version) = captures.get(1) {
-            return Some(version.as_str().to_string());
-        }
+    if let Some(captures) = pattern.captures(desc)
+        && let Some(version) = captures.get(1)
+    {
+        return Some(version.as_str().to_string());
     }
     None
 }
@@ -576,24 +572,21 @@ where
         let vms = final_order
             .iter()
             .filter_map(|e| {
-                if !e.is_dir() {
-                    if let Some(os_ext) = e.extension() {
-                        if let Some(ext) = os_ext.to_ascii_lowercase().to_str() {
-                            if ext.contains("archive") {
-                                if let Some(file_name) = e.file_name().and_then(|n| n.to_str()) {
-                                    let data = PluginData {
-                                        name: file_name.to_owned(),
-                                        size: e.metadata().unwrap().len(),
-                                        description: None,
-                                        version: None,
-                                        masters: None,
-                                        game_version: game_version_semver.clone(),
-                                    };
-                                    return Some(data);
-                                }
-                            }
-                        }
-                    }
+                if !e.is_dir()
+                    && let Some(os_ext) = e.extension()
+                    && let Some(ext) = os_ext.to_ascii_lowercase().to_str()
+                    && ext.contains("archive")
+                    && let Some(file_name) = e.file_name().and_then(|n| n.to_str())
+                {
+                    let data = PluginData {
+                        name: file_name.to_owned(),
+                        size: e.metadata().unwrap().len(),
+                        description: None,
+                        version: None,
+                        masters: None,
+                        game_version: game_version_semver.clone(),
+                    };
+                    return Some(data);
                 }
                 None
             })
@@ -702,15 +695,15 @@ pub fn check_order(result: &[String], order_rules: &[EOrderRule]) -> bool {
     let order = get_ordering_from_order_rules(order_rules);
     let pairs = order;
     for (a, b) in pairs {
-        if let Some(results_for_a) = wild_contains(result, &a) {
-            if let Some(results_for_b) = wild_contains(result, &b) {
-                for i in &results_for_a {
-                    for j in &results_for_b {
-                        let pos_a = result.iter().position(|x| x == i).unwrap();
-                        let pos_b = result.iter().position(|x| x == j).unwrap();
-                        if pos_a > pos_b {
-                            return false;
-                        }
+        if let Some(results_for_a) = wild_contains(result, &a)
+            && let Some(results_for_b) = wild_contains(result, &b)
+        {
+            for i in &results_for_a {
+                for j in &results_for_b {
+                    let pos_a = result.iter().position(|x| x == i).unwrap();
+                    let pos_b = result.iter().position(|x| x == j).unwrap();
+                    if pos_a > pos_b {
+                        return false;
                     }
                 }
             }

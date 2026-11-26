@@ -5,6 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.5.0"
 rust-version = "1.95"
+edition = "2024"
 authors = ["Moritz Baron"]
 description = "PLOX - Plugin Load Order eXpert. PLOX is a tool for analyzing and sorting your plugin load order. Supports Morrowind, OpenMW and Cyberpunk"
 documentation = ""
@@ -17,7 +18,7 @@ byteorder = "1.5"
 
 [package]
 name = "plox"
-edition = "2021"
+edition.workspace = true
 version.workspace = true
 rust-version.workspace = true
 authors.workspace = true

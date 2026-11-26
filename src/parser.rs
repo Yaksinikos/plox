@@ -399,11 +399,11 @@ impl Parser {
 
                                 // check for those darned comments
                                 if is_first_line {
-                                    if let Some(first_char) = line.chars().next() {
-                                        if first_char.is_ascii_whitespace() {
-                                            comment += line.as_str();
-                                            continue;
-                                        }
+                                    if let Some(first_char) = line.chars().next()
+                                        && first_char.is_ascii_whitespace()
+                                    {
+                                        comment += line.as_str();
+                                        continue;
                                     }
 
                                     if !comment.is_empty() {
@@ -792,16 +792,16 @@ fn parse_desc(input: &str) -> Option<(String, String, bool)> {
         }
     }
     //  /This version is compatible with Better Robes and Better Clothes./ UFR_v3dot2.esp]
-    else if let Some(input) = input.strip_prefix('/') {
-        if let Some(end_index) = input.rfind('/') {
-            // Extract the substring between "/" and "/"
-            let left_part = input[..end_index].trim().to_string();
+    else if let Some(input) = input.strip_prefix('/')
+        && let Some(end_index) = input.rfind('/')
+    {
+        // Extract the substring between "/" and "/"
+        let left_part = input[..end_index].trim().to_string();
 
-            // Extract the substring right of the last "/"
-            let right_part = input[end_index + 1..].trim().to_string();
+        // Extract the substring right of the last "/"
+        let right_part = input[end_index + 1..].trim().to_string();
 
-            return Some((right_part, left_part, false));
-        }
+        return Some((right_part, left_part, false));
     }
 
     None
@@ -811,21 +811,19 @@ fn parse_desc(input: &str) -> Option<(String, String, bool)> {
 fn parse_size(input: &str) -> Option<(String, u64, bool)> {
     // !4921700 Annastia V3.3.esp]
     if let Some(input) = input.strip_prefix('!') {
-        if let Some(left_part) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(left_part) {
-                if let Ok(size) = left_part.parse::<u64>() {
-                    return Some((right_part[1..].to_owned(), size, true));
-                }
-            }
+        if let Some(left_part) = input.split_whitespace().next()
+            && let Some(right_part) = input.trim_start().strip_prefix(left_part)
+            && let Ok(size) = left_part.parse::<u64>()
+        {
+            return Some((right_part[1..].to_owned(), size, true));
         }
     }
     // 591786 BMS_Timers_Patch.esp]
-    else if let Some(left_part) = input.split_whitespace().next() {
-        if let Some(right_part) = input.trim_start().strip_prefix(left_part) {
-            if let Ok(size) = left_part.parse::<u64>() {
-                return Some((right_part[1..].to_owned(), size, false));
-            }
-        }
+    else if let Some(left_part) = input.split_whitespace().next()
+        && let Some(right_part) = input.trim_start().strip_prefix(left_part)
+        && let Ok(size) = left_part.parse::<u64>()
+    {
+        return Some((right_part[1..].to_owned(), size, false));
     }
 
     None
@@ -837,29 +835,25 @@ fn parse_ver(input: &str) -> Option<(String, EVerOperator, semver::Version)> {
     // = 2.14 Blood and Gore.esp
     // < 3.1 Class Abilities <VER>.esp
     if let Some(input) = input.strip_prefix('<') {
-        if let Some(version) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(version) {
-                if let Ok(semversion) = lenient_semver::parse(version) {
-                    return Some((right_part.to_owned(), EVerOperator::Less, semversion));
-                }
-            }
+        if let Some(version) = input.split_whitespace().next()
+            && let Some(right_part) = input.trim_start().strip_prefix(version)
+            && let Ok(semversion) = lenient_semver::parse(version)
+        {
+            return Some((right_part.to_owned(), EVerOperator::Less, semversion));
         }
     } else if let Some(input) = input.strip_prefix('>') {
-        if let Some(version) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(version) {
-                if let Ok(semversion) = lenient_semver::parse(version) {
-                    return Some((right_part.to_owned(), EVerOperator::Greater, semversion));
-                }
-            }
+        if let Some(version) = input.split_whitespace().next()
+            && let Some(right_part) = input.trim_start().strip_prefix(version)
+            && let Ok(semversion) = lenient_semver::parse(version)
+        {
+            return Some((right_part.to_owned(), EVerOperator::Greater, semversion));
         }
-    } else if let Some(input) = input.strip_prefix('=') {
-        if let Some(version) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(version) {
-                if let Ok(semversion) = lenient_semver::parse(version) {
-                    return Some((right_part.to_owned(), EVerOperator::Equal, semversion));
-                }
-            }
-        }
+    } else if let Some(input) = input.strip_prefix('=')
+        && let Some(version) = input.split_whitespace().next()
+        && let Some(right_part) = input.trim_start().strip_prefix(version)
+        && let Ok(semversion) = lenient_semver::parse(version)
+    {
+        return Some((right_part.to_owned(), EVerOperator::Equal, semversion));
     }
 
     None
@@ -871,29 +865,25 @@ fn parse_gver(input: &str) -> Option<(String, EGVerOperator, semver::Version)> {
     // = 2.14 Blood and Gore.esp
     // < 3.1 Class Abilities <VER>.esp
     if let Some(input) = input.strip_prefix('<') {
-        if let Some(version) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(version) {
-                if let Ok(semversion) = lenient_semver::parse(version) {
-                    return Some((right_part.to_owned(), EGVerOperator::Less, semversion));
-                }
-            }
+        if let Some(version) = input.split_whitespace().next()
+            && let Some(right_part) = input.trim_start().strip_prefix(version)
+            && let Ok(semversion) = lenient_semver::parse(version)
+        {
+            return Some((right_part.to_owned(), EGVerOperator::Less, semversion));
         }
     } else if let Some(input) = input.strip_prefix('>') {
-        if let Some(version) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(version) {
-                if let Ok(semversion) = lenient_semver::parse(version) {
-                    return Some((right_part.to_owned(), EGVerOperator::Greater, semversion));
-                }
-            }
+        if let Some(version) = input.split_whitespace().next()
+            && let Some(right_part) = input.trim_start().strip_prefix(version)
+            && let Ok(semversion) = lenient_semver::parse(version)
+        {
+            return Some((right_part.to_owned(), EGVerOperator::Greater, semversion));
         }
-    } else if let Some(input) = input.strip_prefix('=') {
-        if let Some(version) = input.split_whitespace().next() {
-            if let Some(right_part) = input.trim_start().strip_prefix(version) {
-                if let Ok(semversion) = lenient_semver::parse(version) {
-                    return Some((right_part.to_owned(), EGVerOperator::Equal, semversion));
-                }
-            }
-        }
+    } else if let Some(input) = input.strip_prefix('=')
+        && let Some(version) = input.split_whitespace().next()
+        && let Some(right_part) = input.trim_start().strip_prefix(version)
+        && let Ok(semversion) = lenient_semver::parse(version)
+    {
+        return Some((right_part.to_owned(), EGVerOperator::Equal, semversion));
     }
 
     None

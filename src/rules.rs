@@ -587,10 +587,10 @@ impl TWarningRule for Requires {
         let mut comment = self.comment.clone();
 
         // automatically set the comment to the two expressions
-        if let Some(expr_a) = &self.expression_a {
-            if let Some(expr_b) = &self.expression_b {
-                comment = format!("'{}' requires '{}' ({})", expr_a, expr_b, self.comment);
-            }
+        if let Some(expr_a) = &self.expression_a
+            && let Some(expr_b) = &self.expression_b
+        {
+            comment = format!("'{}' requires '{}' ({})", expr_a, expr_b, self.comment);
         }
 
         comment
@@ -605,15 +605,13 @@ impl TWarningRule for Requires {
     /// Requires evaluates as true if A is true and B is not true
     fn eval(&mut self, items: &[PluginData]) -> bool {
         let mut result = false;
-        if let Some(expr_a) = &self.expression_a {
-            if let Some(expr_b) = &self.expression_b {
-                if let Some(plugins) = expr_a.eval(items) {
-                    if expr_b.eval(items).is_none() {
-                        result = true;
-                        self.plugins.extend(plugins);
-                    }
-                }
-            }
+        if let Some(expr_a) = &self.expression_a
+            && let Some(expr_b) = &self.expression_b
+            && let Some(plugins) = expr_a.eval(items)
+            && expr_b.eval(items).is_none()
+        {
+            result = true;
+            self.plugins.extend(plugins);
         }
         result
     }
@@ -699,21 +697,21 @@ impl TWarningRule for Patch {
     /// Patch evaluates as true if A is true and B is not true or if B is true and A is not true
     fn eval(&mut self, items: &[PluginData]) -> bool {
         let mut result = false;
-        if let Some(expr_a) = &self.expression_a {
-            if let Some(expr_b) = &self.expression_b {
-                if let Some(plugins_a) = expr_a.eval(items) {
-                    if expr_b.eval(items).is_none() {
-                        result = true;
-                        self.plugins.extend(plugins_a);
-                    }
-                }
+        if let Some(expr_a) = &self.expression_a
+            && let Some(expr_b) = &self.expression_b
+        {
+            if let Some(plugins_a) = expr_a.eval(items)
+                && expr_b.eval(items).is_none()
+            {
+                result = true;
+                self.plugins.extend(plugins_a);
+            }
 
-                if let Some(plugins_b) = expr_b.eval(items) {
-                    if expr_a.eval(items).is_none() {
-                        result = true;
-                        self.plugins.extend(plugins_b);
-                    }
-                }
+            if let Some(plugins_b) = expr_b.eval(items)
+                && expr_a.eval(items).is_none()
+            {
+                result = true;
+                self.plugins.extend(plugins_b);
             }
         }
         result

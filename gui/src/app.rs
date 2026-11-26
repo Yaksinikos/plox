@@ -217,10 +217,10 @@ impl eframe::App for TemplateApp {
                     |ui| {
                         if ui.button("Save").clicked() {
                             // save to plox.toml
-                            if let Ok(s) = toml::to_string_pretty(&self.settings) {
-                                if let Err(e) = std::fs::write(PLOX_CONF_FILE, s) {
-                                    error!("Error writing settings to file: {}", e);
-                                }
+                            if let Ok(s) = toml::to_string_pretty(&self.settings)
+                                && let Err(e) = std::fs::write(PLOX_CONF_FILE, s)
+                            {
+                                error!("Error writing settings to file: {}", e);
                             }
                             self.settings_open = false;
                         }
