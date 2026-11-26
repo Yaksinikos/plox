@@ -45,7 +45,6 @@ description.workspace = true
 documentation.workspace = true
 
 [dependencies]
-openmw-cfg = "0.6"                                              # move to feature flag
 clap = { workspace = true }
 petgraph = "0.8"
 rust-ini = "0.21"
@@ -61,6 +60,7 @@ byteorder = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 serde = { workspace = true }
+openmw-config = { version = "3.0.2", default-features = false }
 
 [lints]
 workspace = true
@@ -69,6 +69,7 @@ workspace = true
 pretty_assertions = "1.4"
 serde_json = "1.0"
 rand = "0.10"
+tempfile = "3.27.0"
 
 
 [profile.release]

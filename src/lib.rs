@@ -68,9 +68,13 @@ pub const GRAPH_FILE: &str = "graphviz.dot";
 /// Detect game from current working directory
 #[must_use]
 pub fn detect_game() -> Option<ESupportedGame> {
-    if PathBuf::from("Morrowind.exe").exists() {
+    if PathBuf::from("Morrowind.exe").exists() || PathBuf::from("Morrowind.ini").exists() {
         Some(ESupportedGame::Morrowind)
-    } else if PathBuf::from("openmw.cfg").exists() {
+    } else if PathBuf::from("openmw.cfg").exists()
+        || openmw_config::try_default_user_config_file().is_ok_and(|p| p.is_file())
+        || openmw_config::try_default_global_config_path()
+            .is_ok_and(|p| p.join("openmw.cfg").is_file())
+    {
         Some(ESupportedGame::Openmw)
     } else if PathBuf::from("bin")
         .join("x64")
@@ -390,19 +394,73 @@ where
     names
 }
 
+/// Loads the `OpenMW` configuration chain.
+///
+/// An `openmw.cfg` in the current directory is used first, then the `OpenMW` discovery
+/// (`OPENMW_CONFIG`, `OPENMW_CONFIG_DIR`, root and global config, then the user config).
+///
+/// # Errors
+///
+/// Returns an error if no `openmw.cfg` is found or the chain cannot be parsed.
+pub fn load_openmw_config() -> io::Result<openmw_config::OpenMWConfiguration> {
+    let local = PathBuf::from("openmw.cfg");
+    let config = if local.is_file() {
+        openmw_config::OpenMWConfiguration::new(Some(env::current_dir()?))
+    } else {
+        openmw_config::OpenMWConfiguration::from_env_or_user_config()
+    };
+    config.map_err(io::Error::other)
+}
+
+/// Finds `name` in the `data=` directories. Later directories override earlier ones.
+fn find_in_data_dirs(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
+    let lower = name.to_lowercase();
+    dirs.iter().rev().find_map(|dir| {
+        let exact = dir.join(name);
+        if exact.is_file() {
+            return Some(exact);
+        }
+        fs::read_dir(dir).ok()?.map_while(Result::ok).find_map(|e| {
+            let path = e.path();
+            (path.is_file() && e.file_name().to_string_lossy().to_lowercase() == lower)
+                .then_some(path)
+        })
+    })
+}
+
 #[must_use]
 pub fn gather_openmw_mods() -> Vec<PluginData> {
-    // parse cfg
-    if let Ok(cfg) = openmw_cfg::get_config() {
-        if let Ok(files) = openmw_cfg::get_plugins(&cfg) {
-            let names = files.iter().filter_map(|f| map_data(f)).collect::<Vec<_>>();
-            return names;
+    match load_openmw_config() {
+        Ok(cfg) => openmw_mods(&cfg),
+        Err(e) => {
+            error!("No usable openmw.cfg found: {e}");
+            vec![]
         }
-    } else {
-        error!("No openmw.cfg found");
+    }
+}
+
+/// The `content=` files of `cfg`, looked up in its `data=` directories
+#[must_use]
+pub fn openmw_mods(cfg: &openmw_config::OpenMWConfiguration) -> Vec<PluginData> {
+    let dirs = cfg
+        .data_directories_iter()
+        .map(|d| d.parsed().to_path_buf())
+        .collect::<Vec<_>>();
+
+    let mut names = vec![];
+    for file in cfg.content_files_iter() {
+        let name = file.value_str();
+        if let Some(path) = find_in_data_dirs(&dirs, name) {
+            if let Some(data) = map_data(&path) {
+                names.push(data);
+            }
+        } else {
+            warn!("Content file {name} not found in any data directory");
+        }
     }
 
-    vec![]
+    info!("Found {} active plugins", names.len());
+    names
 }
 
 fn map_data(f: &Path) -> Option<PluginData> {
@@ -619,33 +677,14 @@ fn update_cp77(_result: &[String]) -> std::io::Result<()> {
 }
 
 fn update_openmw(result: &[String]) -> std::io::Result<()> {
-    // in openMW we just update the cfg with the new order
-    if let Ok(_cfg) = openmw_cfg::get_config() {
-        let path = openmw_cfg::config_path();
-
-        // parse ini
-        let mut buf = Vec::new();
-        for line in read_lines(&path)?.map_while(Result::ok) {
-            // skip plugin lines
-
-            if line.starts_with("content=") {
-                continue;
-            }
-            writeln!(buf, "{line}")?;
-        }
-
-        // add filenames
-        for r in result {
-            writeln!(buf, "content={r}")?;
-        }
-
-        // save
-        let mut file = File::create(path)?;
-        file.write_all(&buf)?;
-    } else {
-        error!("No openmw.cfg found");
-    }
-
+    // only the user openmw.cfg is written; parent configs get a `replace=content` there if needed
+    let mut cfg = load_openmw_config()?;
+    cfg.set_content_files(Some(result.to_vec()));
+    cfg.save_user().map_err(io::Error::other)?;
+    info!(
+        "Saved load order to {}",
+        cfg.user_config_path().join("openmw.cfg").display()
+    );
     Ok(())
 }
 
