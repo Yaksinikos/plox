@@ -117,7 +117,7 @@ fn status_actions(app: &mut PloxApp, ui: &mut egui::Ui, data: &PipelineResult) {
             ui.add_enabled_ui(enabled, |ui| {
                 let r = ui.add_sized([ui.available_width(), 0_f32], egui::Button::new("Accept"));
                 if r.clicked() {
-                    match update_new_load_order(data.game, &data.new_order) {
+                    match update_new_load_order(data.game, &data.root, &data.new_order) {
                         Ok(()) => info!("Update successful"),
                         Err(e) => error!("Could not update load order: {e}"),
                     }

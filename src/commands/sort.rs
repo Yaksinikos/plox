@@ -68,7 +68,7 @@ pub fn sort(options: &CliSortOptions) -> ExitCode {
     };
 
     match sorter.topo_sort(game, &mods, &parser.order_rules, &parser.warning_rules) {
-        Ok(result) => apply_result(game, &mods, &result, options.dry_run),
+        Ok(result) => apply_result(game, &root, &mods, &result, options.dry_run),
         Err(e) => {
             error!("error sorting: {e:?}");
             ExitCode::FAILURE
@@ -101,6 +101,7 @@ fn print_warning(rule: &EWarningRule) {
 /// Reports the sorted order and writes it to disk unless `dry_run` is set.
 fn apply_result(
     game: ESupportedGame,
+    root: &std::path::Path,
     mods: &[PluginData],
     result: &[String],
     dry_run: bool,
@@ -129,7 +130,7 @@ fn apply_result(
     }
 
     info!("New:\n{result:?}");
-    match update_new_load_order(game, result) {
+    match update_new_load_order(game, root, result) {
         Ok(()) => {
             info!("Update successful");
             ExitCode::SUCCESS

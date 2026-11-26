@@ -65,10 +65,38 @@ pub const GRAPH_FILE: &str = "graphviz.dot";
 // GAMES
 ////////////////////////////////////////////////////////////////////////
 
+/// Returns the entry `name` in `dir`, matching the name case-insensitively.
+///
+/// Prefers an exact match. Falls back to `dir/name` if no entry matches, so the result can
+/// still be used for error messages or for creating the file.
+#[must_use]
+pub fn find_case_insensitive(dir: &Path, name: &str) -> PathBuf {
+    let exact = dir.join(name);
+    if exact.exists() {
+        return exact;
+    }
+    let dir = if dir.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        dir
+    };
+    fs::read_dir(dir)
+        .ok()
+        .and_then(|entries| {
+            entries
+                .map_while(Result::ok)
+                .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        })
+        .map_or(exact, |e| e.path())
+}
+
 /// Detect game from current working directory
 #[must_use]
 pub fn detect_game() -> Option<ESupportedGame> {
-    if PathBuf::from("Morrowind.exe").exists() || PathBuf::from("Morrowind.ini").exists() {
+    let here = Path::new(".");
+    if find_case_insensitive(here, "Morrowind.exe").exists()
+        || find_case_insensitive(here, "Morrowind.ini").exists()
+    {
         Some(ESupportedGame::Morrowind)
     } else if PathBuf::from("openmw.cfg").exists()
         || openmw_config::try_default_user_config_file().is_ok_and(|p| p.is_file())
@@ -389,19 +417,20 @@ pub fn gather_tes3_mods<P>(path: &P) -> Vec<PluginData>
 where
     P: AsRef<Path>,
 {
-    let files = get_plugins_sorted(&path.as_ref().join("Data Files"), false);
+    let root = path.as_ref();
+    let files = get_plugins_sorted(&find_case_insensitive(root, "Data Files"), false);
     let names = files.iter().filter_map(|f| map_data(f)).collect::<Vec<_>>();
 
     // check against mw ini
-    let morrowind_ini_path = PathBuf::from("Morrowind.ini");
+    let morrowind_ini_path = find_case_insensitive(root, "Morrowind.ini");
     if morrowind_ini_path.exists() {
         // parse ini
         if let Ok(ini) = Ini::load_from_file(morrowind_ini_path) {
             let mut final_files: Vec<PluginData> = vec![];
             if let Some(section) = ini.section(Some("Game Files")) {
-                let mods_in_ini: Vec<_> = section.iter().map(|f| f.1).collect();
+                let mods_in_ini: Vec<String> = section.iter().map(|f| f.1.to_lowercase()).collect();
                 for data in names {
-                    if mods_in_ini.contains(&data.name.as_str()) {
+                    if mods_in_ini.contains(&data.name.to_lowercase()) {
                         final_files.push(data);
                     }
                 }
@@ -688,9 +717,13 @@ where
 /// # Errors
 ///
 /// Returns an error if the load order cannot be written.
-pub fn update_new_load_order(game: ESupportedGame, result: &[String]) -> std::io::Result<()> {
+pub fn update_new_load_order(
+    game: ESupportedGame,
+    root: &Path,
+    result: &[String],
+) -> std::io::Result<()> {
     match game {
-        ESupportedGame::Morrowind => update_tes3(PathBuf::from("Morrowind.ini"), result, false),
+        ESupportedGame::Morrowind => update_tes3(root, result, false),
         ESupportedGame::Openmw => update_openmw(result),
         ESupportedGame::Cyberpunk => update_cp77(result),
     }
@@ -716,20 +749,35 @@ fn update_openmw(result: &[String]) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Writes the load order to `Morrowind.ini` and redates the plugins in `Data Files`.
+/// Writes the load order to `Morrowind.ini` in `root` and redates the plugins in `Data Files`.
+///
+/// Plugin names are matched case-insensitively and written with their case on disk.
 ///
 /// # Errors
 ///
 /// Returns an error if the ini cannot be written or plugins cannot be redated.
-pub fn update_tes3<P: AsRef<Path>>(
-    morrowind_ini_path: P,
-    result: &[String],
-    no_redate: bool,
-) -> std::io::Result<()> {
-    // in tes3 we first update the ini with the new order (this is technically not important but we might as well)
-    // check against mw ini
+pub fn update_tes3(root: &Path, result: &[String], no_redate: bool) -> std::io::Result<()> {
+    let data_files = find_case_insensitive(root, "Data Files");
+    let on_disk: HashMap<String, String> = fs::read_dir(&data_files)
+        .map(|entries| {
+            entries
+                .map_while(Result::ok)
+                .map(|e| {
+                    let name = e.file_name().to_string_lossy().into_owned();
+                    (name.to_lowercase(), name)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let names = result
+        .iter()
+        .map(|f| on_disk.get(&f.to_lowercase()).unwrap_or(f).clone())
+        .collect::<Vec<_>>();
+    let files = names.iter().map(|f| data_files.join(f)).collect::<Vec<_>>();
 
-    if morrowind_ini_path.as_ref().exists() {
+    // in tes3 we first update the ini with the new order (this is technically not important but we might as well)
+    let morrowind_ini_path = find_case_insensitive(root, "Morrowind.ini");
+    if morrowind_ini_path.exists() {
         // parse ini
         let mut buf = Vec::new();
         for line in read_lines(&morrowind_ini_path)?.map_while(Result::ok) {
@@ -745,7 +793,7 @@ pub fn update_tes3<P: AsRef<Path>>(
 
         // add filenames
         writeln!(buf, "[Game Files]")?;
-        for (i, r) in result.iter().enumerate() {
+        for (i, r) in names.iter().enumerate() {
             writeln!(buf, "GameFile{i}={r}")?;
         }
 
@@ -757,11 +805,6 @@ pub fn update_tes3<P: AsRef<Path>>(
     }
 
     if !no_redate {
-        // redate files
-        let files = result
-            .iter()
-            .map(|f| PathBuf::from("Data Files").join(f))
-            .collect::<Vec<_>>();
         redate_mods(&files)?;
     }
 

@@ -38,6 +38,8 @@ pub struct PipelineOptions {
 #[derive(Debug, Clone)]
 pub struct PipelineResult {
     pub game: ESupportedGame,
+    /// Game root folder the mods were gathered from
+    pub root: PathBuf,
     pub game_version: Option<String>,
     pub old_order: Vec<String>,
     pub new_order: Vec<String>,
@@ -135,6 +137,7 @@ pub fn run(options: &PipelineOptions, progress: impl Fn(&str)) -> Result<Pipelin
 
     Ok(PipelineResult {
         game,
+        root: options.root.clone(),
         game_version,
         old_order,
         new_order,
