@@ -1022,87 +1022,59 @@ where
     result
 }
 
+/// Whether `pattern` contains wildcards (`*`, `?` or `<ver>`)
+fn is_wildcard(pattern: &str) -> bool {
+    pattern.contains('*') || pattern.contains('?') || pattern.contains("<ver>")
+}
+
+/// Builds an anchored regex from a wildcard pattern.
+///
+/// Every regex metacharacter in `pattern` matches literally, except `*` (any sequence),
+/// `?` (any single character) and `<ver>` (a version number such as `1.2.3a`, `1.0`, `1`, `1a`, `1_3a` or `77g`).
+#[must_use]
+pub fn wildcard_regex(pattern: &str) -> Option<Regex> {
+    let escaped = regex::escape(pattern)
+        .replace(r"\*", ".*")
+        .replace(r"\?", ".")
+        .replace("<ver>", r"(\d+(?:[_.-]?\d+)*[a-z]?)");
+    Regex::new(&format!("^{escaped}$"))
+        .map_err(|e| log::error!("Could not construct wildcard pattern for {pattern}: {e}"))
+        .ok()
+}
+
 /// Checks if the list contains the str
 #[must_use]
 pub fn wild_contains(list: &[String], str: &String) -> Option<Vec<String>> {
-    if str.contains('*') || str.contains('?') || str.contains("<ver>") {
-        let mut results = vec![];
-        // Replace * with .* to match any sequence of characters
-        let mut regex_pattern = str.replace('*', r".*");
-        // Replace ? with . to match any single character
-        regex_pattern = regex_pattern.replace('?', r".");
-        // Replace <ver> with (\d+(?:[_.-]?\d+)*[a-z]?) to match a version number :hidethepain:
-        // the following are valid version numbers: 1.2.3a, 1.0, 1, 1a, 1_3a, 77g
-        regex_pattern = regex_pattern.replace("<ver>", r"(\d+(?:[_.-]?\d+)*[a-z]?)");
-
-        regex_pattern = format!("^{regex_pattern}$");
-        if let Ok(regex) = regex::Regex::new(&regex_pattern) {
-            for item in list {
-                // Check if the item matches the pattern
-                if regex.is_match(item) {
-                    //return true;
-                    results.push(item.to_owned());
-                }
-            }
-        } else {
-            log::error!("Could not construct wildcard pattern for {str}");
-            return None;
-        }
-
-        if results.is_empty() {
-            return None;
-        }
-
-        return Some(results);
+    if is_wildcard(str) {
+        let regex = wildcard_regex(str)?;
+        let results: Vec<String> = list
+            .iter()
+            .filter(|item| regex.is_match(item))
+            .cloned()
+            .collect();
+        return (!results.is_empty()).then_some(results);
     }
 
-    if list.contains(str) {
-        return Some(vec![str.to_owned()]);
-    }
-
-    None
+    list.contains(str).then(|| vec![str.to_owned()])
 }
 
 /// Checks if the list contains the str
 #[must_use]
 pub fn wild_contains_data(list: &[PluginData], str: &str) -> Option<Vec<PluginData>> {
     let str = str.to_lowercase();
-    if str.contains('*') || str.contains('?') || str.contains("<ver>") {
-        let mut results = vec![];
-        // Replace * with .* to match any sequence of characters
-        let mut regex_pattern = str.replace('*', r".*");
-        // Replace ? with . to match any single character
-        regex_pattern = regex_pattern.replace('?', r".");
-        // Replace <ver> with (\d+(?:[_.-]?\d+)*[a-z]?) to match a version number :hidethepain:
-        // the following are valid version numbers: 1.2.3a, 1.0, 1, 1a, 1_3a, 77g
-        regex_pattern = regex_pattern.replace("<ver>", r"(\d+(?:[_.-]?\d+)*[a-z]?)");
-
-        regex_pattern = format!("^{regex_pattern}$");
-        if let Ok(regex) = regex::Regex::new(&regex_pattern) {
-            for item in list {
-                // Check if the item matches the pattern
-                if regex.is_match(&item.name) {
-                    //return true;
-                    results.push(item.to_owned());
-                }
-            }
-        } else {
-            log::error!("Could not construct wildcard pattern for {str}");
-            return None;
-        }
-
-        if results.is_empty() {
-            return None;
-        }
-
-        return Some(results);
+    if is_wildcard(&str) {
+        let regex = wildcard_regex(&str)?;
+        let results: Vec<PluginData> = list
+            .iter()
+            .filter(|item| regex.is_match(&item.name))
+            .cloned()
+            .collect();
+        return (!results.is_empty()).then_some(results);
     }
 
-    if let Some(r) = list.iter().find(|f| f.name.to_lowercase().eq(&str)) {
-        return Some(vec![r.to_owned()]);
-    }
-
-    None
+    list.iter()
+        .find(|f| f.name.to_lowercase() == str)
+        .map(|r| vec![r.to_owned()])
 }
 
 #[must_use]

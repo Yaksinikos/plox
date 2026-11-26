@@ -19,6 +19,58 @@ mod unit_tests {
     }
 
     #[test]
+    fn test_wildcard_escapes_regex_metacharacters() {
+        // rfuzzo/plox#37
+        let list = vec![
+            "better morrowind armor defemm(a).esp".to_owned(),
+            "better morrowind armor defemma.esp".to_owned(),
+            "mod [v2].esp".to_owned(),
+            "modxv2.esp".to_owned(),
+            "a+b 1.2.esp".to_owned(),
+            "aab 1.2.esp".to_owned(),
+            "dotxesp".to_owned(),
+        ];
+
+        assert_eq!(
+            wild_contains(&list, &"better morrowind armor defemm(?).esp".to_owned()),
+            Some(vec!["better morrowind armor defemm(a).esp".to_owned()])
+        );
+        assert_eq!(
+            wild_contains(&list, &"mod [*].esp".to_owned()),
+            Some(vec!["mod [v2].esp".to_owned()])
+        );
+        assert_eq!(
+            wild_contains(&list, &"a+b <ver>.esp".to_owned()),
+            Some(vec!["a+b 1.2.esp".to_owned()])
+        );
+        // `.` is literal
+        assert_eq!(wild_contains(&list, &"dot*.esp".to_owned()), None);
+    }
+
+    #[test]
+    fn test_wildcard_data_escapes_regex_metacharacters() {
+        let plugin = |name: &str| PluginData {
+            name: name.to_owned(),
+            size: 0,
+            description: None,
+            version: None,
+            masters: None,
+            game_version: None,
+        };
+        let list = vec![
+            plugin("better morrowind armor defemm(a).esp"),
+            plugin("better morrowind armor defemma.esp"),
+        ];
+
+        let found = wild_contains_data(&list, "Better Morrowind Armor DeFemm(?).ESP")
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| p.name)
+            .collect::<Vec<_>>();
+        assert_eq!(found, vec!["better morrowind armor defemm(a).esp"]);
+    }
+
+    #[test]
     fn test_cycle() {
         init();
 
