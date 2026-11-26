@@ -9,7 +9,7 @@ use std::{
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use crate::{expressions::*, parser, PluginData};
+use crate::{PluginData, expressions::*, parser};
 
 ///////////////////////////////////////////////////
 // ENUMS

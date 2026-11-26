@@ -7,7 +7,7 @@ use std::fmt::Display;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 
-use crate::{wild_contains, wild_contains_data, PluginData};
+use crate::{PluginData, wild_contains, wild_contains_data};
 
 // An expression may be evaluated against a load order
 pub trait TExpression {
@@ -173,11 +173,7 @@ impl TExpression for ALL {
             }
         }
 
-        if result {
-            Some(results)
-        } else {
-            None
-        }
+        if result { Some(results) } else { None }
     }
 }
 
@@ -222,11 +218,7 @@ impl TExpression for ANY {
             }
         }
 
-        if result {
-            Some(results)
-        } else {
-            None
-        }
+        if result { Some(results) } else { None }
     }
 }
 

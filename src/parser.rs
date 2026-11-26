@@ -7,7 +7,7 @@ use std::path::Path;
 use byteorder::ReadBytesExt;
 use log::*;
 
-use crate::{expressions::*, rules::*, ESupportedGame, PluginData, TParser};
+use crate::{ESupportedGame, PluginData, TParser, expressions::*, rules::*};
 
 pub fn get_parser(game: ESupportedGame, game_version: Option<String>) -> Parser {
     match game {

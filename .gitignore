@@ -4,3 +4,10 @@
 .idea
 unit_log.txt
 /tmp
+
+# generated at runtime
+graphviz.dot
+plox.log
+*.hash
+/mlox
+/plox

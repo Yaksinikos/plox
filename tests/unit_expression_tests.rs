@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod unit_tests {
-    use plox::{expressions::*, rules::TWarningRule, PluginData};
+    use plox::{PluginData, expressions::*, rules::TWarningRule};
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();

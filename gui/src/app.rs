@@ -6,11 +6,11 @@ use std::{
 
 use egui::{Color32, Id, Label, Modal, Sense};
 
-use log::{error, info, LevelFilter};
-use plox::{rules::EWarningRule, update_new_load_order, ESupportedGame, GRAPH_FILE};
+use log::{LevelFilter, error, info};
+use plox::{ESupportedGame, GRAPH_FILE, rules::EWarningRule, update_new_load_order};
 use simplelog::WriteLogger;
 
-use crate::{init_parser, AppData, AppSettings, ELoadStatus, PLOX_CONF_FILE, PLOX_LOG_FILE};
+use crate::{AppData, AppSettings, ELoadStatus, PLOX_CONF_FILE, PLOX_LOG_FILE, init_parser};
 
 #[derive(PartialEq)]
 pub enum EModListView {

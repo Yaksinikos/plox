@@ -4,8 +4,8 @@ use log::warn;
 use petgraph::{graph::NodeIndex, stable_graph::StableGraph};
 
 use crate::{
-    get_ordering_from_order_rules, nearend2, nearstart2, wild_contains, EOrderRule, ESupportedGame,
-    EWarningRule, PluginData, GRAPH_FILE,
+    EOrderRule, ESupportedGame, EWarningRule, GRAPH_FILE, PluginData,
+    get_ordering_from_order_rules, nearend2, nearstart2, wild_contains,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
