@@ -15,6 +15,8 @@ log = "0.4"
 env_logger = "0.11"
 serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.5"
+clap = { version = "4.6", features = ["derive"] }
+dirs = "7.0"
 
 [package]
 name = "plox"
@@ -27,7 +29,7 @@ documentation.workspace = true
 
 [dependencies]
 openmw-cfg = "0.6"                                              # move to feature flag
-clap = { version = "4.6", features = ["derive"] }
+clap = { workspace = true }
 petgraph = "0.8"
 rust-ini = "0.21"
 regex = "1.13"

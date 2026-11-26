@@ -5,6 +5,14 @@ use log::error;
 pub const PLOX_LOG_FILE: &str = "plox.log";
 pub const PLOX_CONF_FILE: &str = "plox.toml";
 
+const SETTINGS_KEYS: [&str; 5] = [
+    "game",
+    "no_rules_download",
+    "log_level",
+    "log_to_file",
+    "ignore_warnings",
+];
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, Default)]
 #[serde(default)]
 pub struct AppSettings {
@@ -41,12 +49,13 @@ impl AppSettings {
         }
     }
 
+    /// Saves the settings, keeping unrelated sections (e.g. `[renderer]`) of the file.
     pub fn save(&self, path: &Path) {
-        match toml::to_string_pretty(self) {
-            Ok(s) => {
-                if let Err(e) = std::fs::write(path, s) {
-                    error!("Error writing settings to file: {e}");
-                }
+        match toml::Table::try_from(self) {
+            Ok(table) => {
+                let entries: Vec<(&str, toml::Value)> =
+                    table.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+                crate::user_config::merge_into_file(path, &SETTINGS_KEYS, &entries);
             }
             Err(e) => error!("Error serializing settings: {e}"),
         }

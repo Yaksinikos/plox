@@ -58,6 +58,10 @@ pub struct PloxApp {
     last_message: String,
     #[serde(skip)]
     renderer_info: Option<String>,
+    #[serde(skip)]
+    smoke_test: bool,
+    #[serde(skip)]
+    frames: u32,
     // Sender/Receiver for async notifications.
     #[serde(skip)]
     tx: Sender<String>,
@@ -90,6 +94,8 @@ impl Default for PloxApp {
             async_log: String::new(),
             last_message: String::new(),
             renderer_info: None,
+            smoke_test: false,
+            frames: 0,
             rx,
             tx,
             rx2,
@@ -98,9 +104,19 @@ impl Default for PloxApp {
     }
 }
 
+/// Startup options passed from the launcher
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AppOptions {
+    /// Render a few frames without running the pipeline, then close
+    pub smoke_test: bool,
+}
+
+/// Frames rendered before a smoke test closes the window
+const SMOKE_TEST_FRAMES: u32 = 3;
+
 impl PloxApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, options: AppOptions) -> Self {
         cc.egui_ctx.set_zoom_factor(1.3);
 
         // Load previous app state (if any).
@@ -110,10 +126,13 @@ impl PloxApp {
             .unwrap_or_default();
 
         app.settings = AppSettings::from_file(&PathBuf::from(PLOX_CONF_FILE));
-        init_logger(&app.settings);
-        info!("PLOX v{}", crate::CARGO_PKG_VERSION);
+        app.smoke_test = options.smoke_test;
 
-        app.start_pipeline(app.settings.ignore_warnings);
+        if app.smoke_test {
+            app.loading = true;
+        } else {
+            app.start_pipeline(app.settings.ignore_warnings);
+        }
         app
     }
 
@@ -167,7 +186,9 @@ impl PloxApp {
     }
 }
 
-fn init_logger(settings: &AppSettings) {
+/// Initializes logging from the `plox.toml` in the current folder.
+pub fn init_logger() {
+    let settings = AppSettings::from_file(&PathBuf::from(PLOX_CONF_FILE));
     let level = level_from_str(settings.log_level.as_deref().unwrap_or("info"));
     if settings.log_to_file
         && let Ok(file) = File::create(PathBuf::from(PLOX_LOG_FILE))
@@ -181,6 +202,7 @@ fn init_logger(settings: &AppSettings) {
             simplelog::ColorChoice::Auto,
         );
     }
+    info!("PLOX v{}", crate::CARGO_PKG_VERSION);
 }
 
 fn level_from_str(log_level: &str) -> LevelFilter {
@@ -197,13 +219,25 @@ fn level_from_str(log_level: &str) -> LevelFilter {
 impl eframe::App for PloxApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        if self.smoke_test {
+            return;
+        }
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         if self.renderer_info.is_none() {
-            self.renderer_info = Some(crate::renderer::active_info(frame));
+            let info = crate::renderer::active_info(frame);
+            info!("Renderer: {info}");
+            self.renderer_info = Some(info);
+        }
+        if self.smoke_test {
+            self.frames += 1;
+            if self.frames >= SMOKE_TEST_FRAMES {
+                info!("Smoke test passed");
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            }
         }
         self.poll_worker();
 

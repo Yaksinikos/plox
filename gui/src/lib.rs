@@ -4,6 +4,7 @@ pub mod launcher;
 pub mod renderer;
 pub mod settings;
 pub mod ui;
+pub mod user_config;
 
 pub use ui::PloxApp;
 
