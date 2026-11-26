@@ -26,7 +26,7 @@ pub struct Args {
     #[arg(long, value_enum)]
     pub renderer: Option<RendererChoice>,
 
-    /// Render a single frame and exit, to check that the renderer works
+    /// Render a few frames and exit, to check that the renderer works (no fallback)
     #[arg(long)]
     pub smoke_test: bool,
 
@@ -60,6 +60,11 @@ pub fn main() -> ExitCode {
 
     match run(backend, &args, chooser) {
         Ok(()) => ExitCode::SUCCESS,
+        Err(e) if backend == Backend::Wgpu && args.smoke_test => {
+            // a smoke test checks this renderer, so do not hide the failure behind the fallback
+            error!("wgpu renderer failed: {e}");
+            ExitCode::FAILURE
+        }
         Err(e) if backend == Backend::Wgpu => {
             error!("wgpu renderer failed: {e}");
             restart_on_glow(&args)

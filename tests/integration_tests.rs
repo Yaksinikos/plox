@@ -17,6 +17,13 @@ mod integration_tests {
         let _ = env_logger::Builder::from_env(env).is_test(true).try_init();
     }
 
+    /// Test output folder inside the target dir
+    fn out_dir() -> PathBuf {
+        let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("integration_tests");
+        create_dir_all(&dir).expect("could not create dir");
+        dir
+    }
+
     fn new_stable_full_sorter() -> Sorter {
         Sorter::new(sorter::ESortType::StableFull, 1000)
     }
@@ -180,14 +187,15 @@ mod integration_tests {
             parser.init_from_file("./tests/mlox/mlox_base.txt")?;
 
             {
-                let file = std::fs::File::create("base_rules.json").expect("file create failed");
+                let file = std::fs::File::create(out_dir().join("base_rules.json"))
+                    .expect("file create failed");
                 serde_json::to_writer_pretty(file, &parser.warning_rules)
                     .expect("serialize failed");
             }
 
             {
-                let file =
-                    std::fs::File::create("base_rules_order.json").expect("file create failed");
+                let file = std::fs::File::create(out_dir().join("base_rules_order.json"))
+                    .expect("file create failed");
                 serde_json::to_writer_pretty(file, &parser.order_rules).expect("serialize failed");
             }
         }
@@ -197,14 +205,15 @@ mod integration_tests {
             parser.init_from_file("./tests/mlox/mlox_user.txt")?;
 
             {
-                let file = std::fs::File::create("user_rules.json").expect("file create failed");
+                let file = std::fs::File::create(out_dir().join("user_rules.json"))
+                    .expect("file create failed");
                 serde_json::to_writer_pretty(file, &parser.warning_rules)
                     .expect("serialize failed");
             }
 
             {
-                let file =
-                    std::fs::File::create("user_rules_order.json").expect("file create failed");
+                let file = std::fs::File::create(out_dir().join("user_rules_order.json"))
+                    .expect("file create failed");
                 serde_json::to_writer_pretty(file, &parser.order_rules).expect("serialize failed");
             }
 
@@ -221,9 +230,8 @@ mod integration_tests {
             parser.init_from_file("./tests/mlox/mlox_base.txt")?;
 
             {
-                create_dir_all("tmp").expect("could not create dir");
-                let mut file =
-                    std::fs::File::create("tmp/base_rules.txt").expect("file create failed");
+                let mut file = std::fs::File::create(out_dir().join("base_rules.txt"))
+                    .expect("file create failed");
                 for rule in parser.warning_rules {
                     writeln!(file, "{rule}").expect("could not write to file");
                 }
@@ -235,9 +243,8 @@ mod integration_tests {
             parser.init_from_file("./tests/mlox/mlox_user.txt")?;
 
             {
-                create_dir_all("tmp").expect("could not create dir");
-                let mut file =
-                    std::fs::File::create("tmp/user_rules.txt").expect("file create failed");
+                let mut file = std::fs::File::create(out_dir().join("user_rules.txt"))
+                    .expect("file create failed");
                 for rule in parser.warning_rules {
                     writeln!(file, "{rule}").expect("could not write to file");
                 }
@@ -266,8 +273,9 @@ mod integration_tests {
         {
             let viz = petgraph::dot::Dot::with_config(&g, &[petgraph::dot::Config::EdgeNoLabel]);
             // write to file
-            let _ = std::fs::create_dir_all("tmp");
-            let mut file = std::fs::File::create("tmp/graphviz.dot").expect("file create failed");
+
+            let mut file =
+                std::fs::File::create(out_dir().join("graphviz.dot")).expect("file create failed");
             std::io::Write::write_all(&mut file, format!("{viz:?}").as_bytes())
                 .expect("write failed");
         }

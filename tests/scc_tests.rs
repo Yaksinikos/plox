@@ -179,7 +179,7 @@ mod scc_tests {
         init();
 
         // delete scc_user folder
-        let tmp_dir = PathBuf::from("tmp/scc_user");
+        let tmp_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("scc_user");
         let _ = std::fs::remove_dir_all(&tmp_dir);
         let _ = std::fs::create_dir_all(&tmp_dir);
 
@@ -195,7 +195,7 @@ mod scc_tests {
     fn scc_base() -> std::io::Result<()> {
         init();
 
-        let tmp_dir = PathBuf::from("tmp/scc_base");
+        let tmp_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("scc_base");
         let _ = std::fs::remove_dir_all(&tmp_dir);
         let _ = std::fs::create_dir_all(&tmp_dir);
 
@@ -212,7 +212,7 @@ mod scc_tests {
         init();
 
         // delete scc_full folder
-        let tmp_dir = PathBuf::from("tmp/scc_full");
+        let tmp_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("scc_full");
         let _ = std::fs::remove_dir_all(&tmp_dir);
         let _ = std::fs::create_dir_all(&tmp_dir);
 

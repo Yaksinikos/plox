@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Lint levels are set in Cargo.toml ([workspace.lints]); deny-level lints fail the build.
+
+jobs:
+  lint:
+    name: Format and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libx11-dev
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy (glow and wgpu)
+        run: cargo clippy --workspace --all-targets --locked
+      - name: Clippy (glow only)
+        run: cargo clippy --workspace --all-targets --locked --no-default-features
+
+  msrv:
+    name: MSRV (1.95)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libx11-dev
+      - name: Install Rust 1.95
+        run: rustup toolchain install 1.95 --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      - name: Check
+        run: cargo +1.95 check --workspace --locked
+      - name: Check (glow only)
+        run: cargo +1.95 check --workspace --locked --no-default-features
+
+  build:
+    name: Build and test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            exe: .exe
+          - name: macos
+            os: macos-latest
+            exe: ""
+          - name: linux
+            os: ubuntu-latest
+            exe: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev libxcb1-dev libxcb-render0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libx11-dev libxcursor1 libxrandr2 libxi6 \
+            libgl1-mesa-dri libegl1 libgl1 mesa-vulkan-drivers libvulkan1 xvfb xauth
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --workspace --locked
+      - name: Test
+        run: cargo test --release --workspace --locked
+      - name: Build (glow only)
+        run: cargo check --release --workspace --locked --no-default-features
+
+      # Headless renderer checks: Mesa llvmpipe for OpenGL, lavapipe for Vulkan.
+      - name: Smoke test (glow)
+        if: runner.os == 'Linux'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: timeout 300 xvfb-run -a -s "-screen 0 1280x1024x24" target/release/plox_gui --renderer glow --smoke-test
+      - name: Smoke test (wgpu, Vulkan lavapipe)
+        if: runner.os == 'Linux'
+        run: timeout 300 xvfb-run -a -s "-screen 0 1280x1024x24" target/release/plox_gui --renderer wgpu --smoke-test
+      - name: CLI runs
+        shell: bash
+        run: target/release/plox${{ matrix.exe }} --help
+
+      - name: Upload artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plox-${{ matrix.name }}
+          path: |
+            target/release/plox${{ matrix.exe }}
+            target/release/plox_gui${{ matrix.exe }}
