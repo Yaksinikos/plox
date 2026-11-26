@@ -8,17 +8,89 @@ Rules are automatically downloaded from the respective Rules repository (see bel
 
 Supported games:
 
-- ✅TES3 - Morrowind
-- ✅OpenMW
+- ✅TES3 - Morrowind (Windows, and Linux/macOS e.g. through Wine or Proton)
+- ✅OpenMW (Windows, Linux, macOS)
 - 🚧Cyberpunk 2077
 
-The PLOX GUI supports a configuration file called `plox.toml` (place next to `plox_gui`) that allows you to customize its behavior. Here's an example of how to use the `plox.toml` file:
+Supported platforms: Windows, Linux (X11 and Wayland) and macOS.
 
-Optional fields:
+## Configuration
+
+The PLOX GUI reads its settings from `plox.toml`. A `plox.toml` in the current folder is used first; otherwise the file in the user config folder is used:
+
+| Platform | User config folder |
+| --- | --- |
+| Windows | `%APPDATA%\plox\` |
+| Linux | `~/.config/plox/` (`$XDG_CONFIG_HOME/plox/`) |
+| macOS | `~/Library/Application Support/plox/` |
+
+All fields are optional:
 
 ```toml
-config = "openmw.cfg"
-game = "OpenMW"
+game = "Openmw"          # Morrowind, Openmw or Cyberpunk; detected if not set
+no_rules_download = false
+log_level = "info"
+log_to_file = false      # writes plox.log next to plox.toml
+ignore_warnings = false
+
+[renderer]
+backend = "auto"         # auto, glow or wgpu
+ask_on_startup = true    # show the renderer dialog on every start
+```
+
+Rules are downloaded into an `mlox` (TES3/OpenMW) or `plox` (Cyberpunk) folder. If that folder exists in the current folder it is used; otherwise the rules are stored in the user data folder (`%APPDATA%\plox\`, `~/.local/share/plox/`, `~/Library/Application Support/plox/`).
+
+### Game detection
+
+If no game is set, PLOX checks in this order:
+
+1. `Morrowind.exe` or `Morrowind.ini` in the current folder (any letter case) → Morrowind
+2. `openmw.cfg` in the current folder → OpenMW
+3. An `openmw.cfg` in the default OpenMW config folders → OpenMW
+4. `bin/x64/Cyberpunk2077.exe` → Cyberpunk 2077
+
+### OpenMW
+
+PLOX resolves the full `openmw.cfg` chain like OpenMW does (`config=` entries, `?userconfig?` and similar tokens, `replace=`, quoted paths with `&&` escapes). An `openmw.cfg` in the current folder is used first, then `OPENMW_CONFIG` (path to a cfg file), `OPENMW_CONFIG_DIR`, the global config and finally the user config. A new load order is written only to the user `openmw.cfg`; other settings and parent configs are left untouched.
+
+## Graphics requirements
+
+The GUI has two renderers. At every start a dialog lets you pick one; tick "Don't ask again" to remember the choice (change it later with `--choose-renderer` or in `plox.toml`).
+
+- **OpenGL (glow)**: needs OpenGL 2.1 or newer. Works on old GPUs and in VMs. If OpenGL fails, update the graphics driver, set `LIBGL_ALWAYS_SOFTWARE=1` on Linux, or use the command line tool.
+- **wgpu**: Vulkan, DirectX 12 or Metal. Recommended for modern GPUs. If wgpu fails to start, PLOX restarts on OpenGL automatically, and offers OpenGL next time.
+
+`auto` uses wgpu if a hardware Vulkan/DX12/Metal adapter is found, otherwise OpenGL.
+
+GUI options:
+
+```txt
+Usage: plox_gui [OPTIONS]
+
+Options:
+      --renderer <RENDERER>  Renderer to use: auto, glow (OpenGL, legacy GPUs) or wgpu (Vulkan/DX12/Metal) [possible values: auto, glow, wgpu]
+      --smoke-test           Render a few frames and exit, to check that the renderer works (no fallback)
+      --choose-renderer      Show the renderer dialog even if "Don't ask again" was chosen
+      --no-chooser           Never show the renderer dialog
+  -h, --help                 Print help
+  -V, --version              Print version
+```
+
+The renderer can also be set with the `PLOX_RENDERER` environment variable (`auto`, `glow`, `wgpu`).
+
+Builds without wgpu (OpenGL only): `cargo build --release --no-default-features`.
+
+### Linux
+
+Runtime packages (Debian/Ubuntu names): `libxkbcommon-x11-0 libgl1 libegl1 libgl1-mesa-dri`, and for wgpu `libvulkan1 mesa-vulkan-drivers` (or your GPU vendor's Vulkan driver). Build packages: `libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libx11-dev`.
+
+## Building
+
+Requires Rust 1.95 or newer (the pinned toolchain is in `rust-toolchain.toml`).
+
+```sh
+cargo build --release --workspace
+cargo test --workspace
 ```
 
 ## Rules
@@ -38,15 +110,15 @@ The rules are hosted in their own repository:
 
 ### GUI
 
-1. Download `plox_gui.exe`from  the latest release from <https://github.com/rfuzzo/plox/releases>
-2. Place `plox_gui.exe` next to the game's exe
-3. Double click `plox_gui.exe` to run
+1. Download `plox_gui` (`plox_gui.exe` on Windows) from the latest release at <https://github.com/rfuzzo/plox/releases>
+2. Morrowind: place it next to `Morrowind.exe`. OpenMW: place it anywhere; the OpenMW config is found automatically
+3. Run `plox_gui`
 
 ### Commandline Interface
 
-1. Download `plox.exe`from  the latest release from <https://github.com/rfuzzo/plox/releases>
-2. Place `plox.exe` next to the game's exe
-3. Open a terminal window and run `plox.exe` with a command
+1. Download `plox` (`plox.exe` on Windows) from the latest release at <https://github.com/rfuzzo/plox/releases>
+2. Morrowind: place it next to `Morrowind.exe`, or pass `--game-folder`. OpenMW: place it anywhere
+3. Open a terminal window and run `plox` with a command
 
 ## Screenshots
 
@@ -57,12 +129,13 @@ The rules are hosted in their own repository:
 
 - [MLOX](https://github.com/mlox/mlox)
 - [MLOX Rules](https://github.com/DanaePlays/mlox-rules)
-- [OpenMw Cfg Crate](https://gitlab.com/bmwinger/openmw-cfg)
+- [openmw-config crate](https://github.com/DreamWeave-MP/Openmw_Config)
+- [egui / eframe](https://github.com/emilk/egui)
 
 ## CLI Commands
 
 ```txt
-Usage: plox.exe [OPTIONS] <COMMAND>
+Usage: plox [OPTIONS] <COMMAND>
 
 Commands:
   sort    Sorts the current mod load order according to specified rules
@@ -84,16 +157,15 @@ Options:
 Sorts the current mod load order according to specified rules
 
 ```txt
-Usage: plox.exe sort [OPTIONS]
+Usage: plox sort [OPTIONS]
 
 Options:
   -g, --game-folder <GAME_FOLDER>  Root game folder (e.g. "Cyberpunk 2077" or "Morrowind"). Default is current working directory
-  -r, --rules-dir <RULES_DIR>      Folder to read sorting rules from. Default is ./mlox for TES3
+  -r, --rules-dir <RULES_DIR>      Folder to read sorting rules from. Default is ./mlox (TES3) or ./plox if present, otherwise the plox data folder
   -d, --dry-run                    Just print the suggested load order without sorting
   -u, --unstable                   Use the potentially faster unstable sorter
   -n, --no-download                Disable automatic downloading of latest ruleset
   -m, --mod-list <MOD_LIST>        Read the input mods from a file instead of checking the root folder
-  -c, --config <CONFIG>            (OpenMW only) Path to the openmw.cfg file
   -h, --help                       Print help
 ```
 
@@ -102,11 +174,10 @@ Options:
 Lists the current mod load order
 
 ```txt
-Usage: plox.exe list [OPTIONS]
+Usage: plox list [OPTIONS]
 
 Options:
   -r, --root <ROOT>      Root game folder (e.g. "Cyberpunk 2077" or "Morrowind"). Default is current working directory
-  -c, --config <CONFIG>  (OpenMW only) Path to the openmw.cfg file
   -h, --help             Print help
 ```
 
@@ -115,10 +186,10 @@ Options:
 Verifies integrity of the specified rules
 
 ```txt
-Usage: plox.exe verify [OPTIONS]
+Usage: plox verify [OPTIONS]
 
 Options:
-  -r, --rules-dir <RULES_DIR>  Folder to read sorting rules from. Default is ./plox or ./mlox for TES3
+  -r, --rules-dir <RULES_DIR>  Folder to read sorting rules from. Default is ./mlox (TES3) or ./plox if present, otherwise the plox data folder
   -h, --help                   Print help
 ```
 
@@ -127,12 +198,11 @@ Options:
 Outputs the rules as a graphviz dot file
 
 ```txt
-Usage: plox.exe graph [OPTIONS]
+Usage: plox graph [OPTIONS]
 
 Options:
   -g, --game-folder <GAME_FOLDER>  Root game folder (e.g. "Cyberpunk 2077" or "Morrowind"). Default is current working directory
-  -r, --rules-dir <RULES_DIR>      Folder to read sorting rules from. Default is ./mlox for TES3
+  -r, --rules-dir <RULES_DIR>      Folder to read sorting rules from. Default is ./mlox (TES3) or ./plox if present, otherwise the plox data folder
   -m, --mod-list <MOD_LIST>        Read the input mods from a file instead of checking the root folder
-  -c, --config <CONFIG>            (OpenMW only) Path to the openmw.cfg file
   -h, --help                       Print help
 ```
