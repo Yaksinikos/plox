@@ -44,6 +44,15 @@ impl Backend {
     }
 }
 
+impl From<Backend> for RendererChoice {
+    fn from(backend: Backend) -> Self {
+        match backend {
+            Backend::Glow => Self::Glow,
+            Backend::Wgpu => Self::Wgpu,
+        }
+    }
+}
+
 /// Whether this build contains the wgpu renderer
 pub const fn wgpu_compiled() -> bool {
     cfg!(feature = "wgpu")

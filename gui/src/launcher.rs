@@ -11,7 +11,7 @@ use log::{error, info, warn};
 use crate::{
     PloxApp,
     renderer::{self, Backend, RendererChoice},
-    ui::AppOptions,
+    ui::{AppOptions, ChooserState},
     user_config::{RendererConfig, crash_marker},
 };
 
@@ -29,17 +29,36 @@ pub struct Args {
     /// Render a single frame and exit, to check that the renderer works
     #[arg(long)]
     pub smoke_test: bool,
+
+    /// Show the renderer dialog even if "Don't ask again" was chosen
+    #[arg(long, conflicts_with = "no_chooser")]
+    pub choose_renderer: bool,
+
+    /// Never show the renderer dialog
+    #[arg(long)]
+    pub no_chooser: bool,
+}
+
+/// How the app starts
+enum Startup {
+    /// Show the renderer dialog on OpenGL first
+    Chooser(ChooserState),
+    /// Start the main view directly
+    Direct(Backend),
 }
 
 /// Entry point of the GUI binary
 pub fn main() -> ExitCode {
     let args = Args::parse();
     crate::ui::init_logger();
-    let choice = requested_renderer(&args);
-    let backend = renderer::resolve(choice);
+
+    let (backend, chooser) = match startup(&args) {
+        Startup::Chooser(state) => (Backend::Glow, Some(state)),
+        Startup::Direct(backend) => (backend, None),
+    };
     info!("Starting with renderer {}", backend.as_str());
 
-    match run(backend, &args) {
+    match run(backend, &args, chooser) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) if backend == Backend::Wgpu => {
             error!("wgpu renderer failed: {e}");
@@ -58,22 +77,67 @@ pub fn main() -> ExitCode {
     }
 }
 
-fn requested_renderer(args: &Args) -> RendererChoice {
-    if let Some(choice) = args.renderer {
-        return choice;
+/// Renderer forced by the command line or environment
+fn forced_renderer(args: &Args) -> Option<RendererChoice> {
+    if args.renderer.is_some() {
+        return args.renderer;
     }
-    if let Ok(value) = std::env::var(RENDERER_ENV) {
-        match RendererChoice::parse(&value) {
-            Some(choice) => return choice,
-            None => warn!("Ignoring invalid {RENDERER_ENV}={value}"),
-        }
+    let value = std::env::var(RENDERER_ENV).ok()?;
+    let choice = RendererChoice::parse(&value);
+    if choice.is_none() {
+        warn!("Ignoring invalid {RENDERER_ENV}={value}");
     }
-    if crash_marker::exists() {
-        warn!("The wgpu renderer did not exit cleanly last time, using OpenGL");
+    choice
+}
+
+fn startup(args: &Args) -> Startup {
+    let crashed = crash_marker::exists();
+    if crashed {
+        warn!("The wgpu renderer did not exit cleanly last time");
         crash_marker::clear();
-        return RendererChoice::Glow;
     }
-    RendererConfig::load().backend
+    let forced = forced_renderer(args);
+    let config = RendererConfig::load();
+
+    let show_chooser = !args.smoke_test
+        && !args.no_chooser
+        && (args.choose_renderer || (forced.is_none() && (crashed || config.ask_on_startup)));
+
+    if !show_chooser {
+        return match forced {
+            Some(choice) => Startup::Direct(renderer::resolve(choice)),
+            None if crashed => Startup::Direct(Backend::Glow),
+            None => Startup::Direct(renderer::resolve(config.backend)),
+        };
+    }
+
+    let wgpu_adapter = renderer::probe_wgpu();
+    let preselect = if crashed {
+        Backend::Glow
+    } else {
+        match forced.unwrap_or(config.backend) {
+            RendererChoice::Glow => Backend::Glow,
+            RendererChoice::Wgpu if renderer::wgpu_compiled() => Backend::Wgpu,
+            RendererChoice::Wgpu => Backend::Glow,
+            RendererChoice::Auto if wgpu_adapter.is_some() => Backend::Wgpu,
+            RendererChoice::Auto => Backend::Glow,
+        }
+    };
+    Startup::Chooser(ChooserState::new(preselect, crashed, wgpu_adapter))
+}
+
+/// Starts a new instance of this executable on `backend`, without the renderer dialog.
+///
+/// # Errors
+///
+/// Returns an error if the process cannot be spawned.
+pub fn relaunch(backend: Backend) -> std::io::Result<()> {
+    let exe = std::env::current_exe()?;
+    info!("Relaunching on renderer {}", backend.as_str());
+    Command::new(exe)
+        .args(["--renderer", backend.as_str(), "--no-chooser"])
+        .spawn()
+        .map(drop)
 }
 
 /// Restarts the current executable on OpenGL. Guarded against restart loops.
@@ -93,7 +157,8 @@ fn restart_on_glow(args: &Args) -> ExitCode {
 
     warn!("Restarting on the OpenGL renderer");
     let mut cmd = Command::new(exe);
-    cmd.args(["--renderer", "glow"]).env(FALLBACK_ENV, "1");
+    cmd.args(["--renderer", "glow", "--no-chooser"])
+        .env(FALLBACK_ENV, "1");
     if args.smoke_test {
         cmd.arg("--smoke-test");
     }
@@ -129,9 +194,10 @@ fn native_options(backend: Backend) -> eframe::NativeOptions {
 }
 
 /// Runs the GUI on `backend` until the window is closed.
-fn run(backend: Backend, args: &Args) -> eframe::Result<()> {
+fn run(backend: Backend, args: &Args, chooser: Option<ChooserState>) -> eframe::Result<()> {
     let app_options = AppOptions {
         smoke_test: args.smoke_test,
+        chooser,
     };
     // A crash marker left behind means the wgpu session died (e.g. a driver crash).
     if backend == Backend::Wgpu {

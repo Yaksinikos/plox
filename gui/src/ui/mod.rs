@@ -1,8 +1,11 @@
 //! Renderer-agnostic UI. Nothing in here depends on a specific graphics backend.
 
 mod main_view;
+mod renderer_chooser;
 mod settings;
 mod status_bar;
+
+pub use renderer_chooser::ChooserState;
 
 use std::{
     fs::File,
@@ -14,7 +17,10 @@ use log::{LevelFilter, info};
 use plox::pipeline::{self, PipelineOptions, PipelineResult};
 use simplelog::WriteLogger;
 
-use crate::settings::{AppSettings, PLOX_CONF_FILE, PLOX_LOG_FILE};
+use crate::{
+    renderer::Backend,
+    settings::{AppSettings, PLOX_CONF_FILE, PLOX_LOG_FILE},
+};
 
 #[derive(PartialEq, Eq)]
 pub enum EModListView {
@@ -61,6 +67,8 @@ pub struct PloxApp {
     #[serde(skip)]
     smoke_test: bool,
     #[serde(skip)]
+    chooser: Option<ChooserState>,
+    #[serde(skip)]
     frames: u32,
     // Sender/Receiver for async notifications.
     #[serde(skip)]
@@ -95,6 +103,7 @@ impl Default for PloxApp {
             last_message: String::new(),
             renderer_info: None,
             smoke_test: false,
+            chooser: None,
             frames: 0,
             rx,
             tx,
@@ -105,10 +114,12 @@ impl Default for PloxApp {
 }
 
 /// Startup options passed from the launcher
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AppOptions {
     /// Render a few frames without running the pipeline, then close
     pub smoke_test: bool,
+    /// Show the renderer dialog before the main view
+    pub chooser: Option<ChooserState>,
 }
 
 /// Frames rendered before a smoke test closes the window
@@ -127,13 +138,39 @@ impl PloxApp {
 
         app.settings = AppSettings::from_file(&PathBuf::from(PLOX_CONF_FILE));
         app.smoke_test = options.smoke_test;
+        app.chooser = options.chooser;
 
         if app.smoke_test {
             app.loading = true;
-        } else {
+        } else if app.chooser.is_none() {
             app.start_pipeline(app.settings.ignore_warnings);
         }
         app
+    }
+
+    /// Handles the renderer dialog. Returns `true` while it is shown.
+    fn show_chooser(&mut self, ui: &mut egui::Ui) -> bool {
+        let Some(state) = &mut self.chooser else {
+            return false;
+        };
+        match renderer_chooser::show(state, ui) {
+            None => true,
+            Some(Backend::Glow) => {
+                self.chooser = None;
+                self.start_pipeline(self.settings.ignore_warnings);
+                true
+            }
+            Some(Backend::Wgpu) => {
+                if let Err(e) = crate::launcher::relaunch(Backend::Wgpu) {
+                    log::error!("Could not start the wgpu renderer: {e}");
+                    self.chooser = None;
+                    self.start_pipeline(self.settings.ignore_warnings);
+                } else {
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                true
+            }
+        }
     }
 
     /// Runs the evaluation pipeline on a worker thread.
@@ -238,6 +275,9 @@ impl eframe::App for PloxApp {
                 info!("Smoke test passed");
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
             }
+        }
+        if self.show_chooser(ui) {
+            return;
         }
         self.poll_worker();
 
